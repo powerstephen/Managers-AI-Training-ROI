@@ -106,7 +106,7 @@ export default function Page() {
   /* Step 2 – AI Maturity */
   const [maturity, setMaturity] = useState<number>(5);
 
-  /* Step 3 – Priorities (selection only; 6 options; top 3 preselected) */
+  /* Step 3 – Priorities */
   const allPriorityKeys: PriorityKey[] = [
     "throughput",
     "quality",
@@ -121,11 +121,11 @@ export default function Page() {
 
   /* Config that lives ONLY on steps 4–6 */
   // Throughput
-  const [throughputPct, setThroughputPct] = useState(8); // % weekly time reclaimed
-  const [handoffPct, setHandoffPct] = useState(6); // % wait/handoff time reduced
+  const [throughputPct, setThroughputPct] = useState(8);
+  const [handoffPct, setHandoffPct] = useState(6);
   // Retention
-  const [retentionLiftPct, setRetentionLiftPct] = useState(2); // % attrition avoided
-  const [baselineAttritionPct, setBaselineAttritionPct] = useState(12); // org attrition
+  const [retentionLiftPct, setRetentionLiftPct] = useState(2);
+  const [baselineAttritionPct, setBaselineAttritionPct] = useState(12);
   // Upskilling
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
@@ -141,27 +141,22 @@ export default function Page() {
     [maturityHoursPerPerson, headcount]
   );
 
-  // base team hours from maturity mapping
   const baseWeeklyTeamHours = useMemo(
     () => maturityHoursPerPerson * headcount,
     [maturityHoursPerPerson, headcount]
   );
 
-  // Weekly hours per selected priority (simple illustrative models)
   const weeklyHoursByPriority = useMemo(() => {
     const entries: Record<PriorityKey, number> = {
       throughput: selected.includes("throughput")
         ? Math.round(baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100))
         : 0,
-
       quality: selected.includes("quality")
         ? Math.round(baseWeeklyTeamHours * 0.2)
         : 0,
-
       onboarding: selected.includes("onboarding")
         ? Math.round((Math.max(0, Math.min(52, 2)) * 40) * (headcount * 0.2))
         : 0,
-
       retention: selected.includes("retention")
         ? Math.round(
             ((headcount * (baselineAttritionPct / 100)) *
@@ -169,11 +164,9 @@ export default function Page() {
               120) / 52
           )
         : 0,
-
       upskilling: selected.includes("upskilling")
         ? Math.round((upskillCoveragePct / 100) * headcount * upskillHoursPerWeek)
         : 0,
-
       costAvoidance: selected.includes("costAvoidance")
         ? Math.round(baseWeeklyTeamHours * 0.1)
         : 0,
@@ -229,29 +222,31 @@ export default function Page() {
   /* ───────────────────────────── Render ───────────────────────────── */
 
   return (
-    <div className="min-h-screen bg-[#f6f8fc] text-[#0e1328]">
-      {/* FULL-BLEED HERO (no side gutters, keeps aspect) */}
-      <div className="w-screen overflow-hidden">
+    <div className="min-h-screen bg-[#0b1022] text-white">
+      {/* HERO: match content width (flush with boxes below), dark theme */}
+      <div className="w-full max-w-6xl mx-auto px-4 pt-4">
         <img
           src="/hero.png"
           alt="AI at Work — Brainster"
-          className="block w-full h-[220px] md:h-[280px] lg:h-[320px] object-cover"
+          className="block w-full h-[200px] md:h-[240px] lg:h-[260px] object-cover rounded-2xl"
         />
       </div>
 
       {/* Progress bar */}
       <div className="w-full max-w-6xl mx-auto px-4 mt-4">
-        <div className="rounded-2xl bg-white shadow-soft p-4 flex gap-4 flex-wrap">
+        <div className="rounded-2xl bg-[#121831] border border-[#1f2747] p-4 flex gap-4 flex-wrap">
           {stepItems.map((s) => (
             <div key={s.id} className="flex items-center gap-2">
               <span
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-semibold ${
-                  step >= s.id ? "bg-[#3366fe]" : "bg-[#b6c3ff]"
+                  step >= s.id ? "bg-[#4b6bff]" : "bg-[#2a3560]"
                 }`}
               >
                 {s.id}
               </span>
-              <span className="text-sm font-medium text-[#0e1328]">{s.label}</span>
+              <span className="text-sm font-medium text-white/90">
+                {s.label}
+              </span>
             </div>
           ))}
         </div>
@@ -259,7 +254,7 @@ export default function Page() {
 
       {/* Card frame */}
       <div className="w-full max-w-6xl mx-auto px-4 mt-4 pb-16">
-        <div className="bg-white rounded-2xl shadow-soft p-6 md:p-8">
+        <div className="bg-[#121831] border border-[#1f2747] rounded-2xl shadow-soft p-6 md:p-8">
           {/* STEP 1 */}
           {step === 1 && (
             <div>
@@ -364,13 +359,12 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 2 – bigger slider + side box */}
+          {/* STEP 2 */}
           {step === 2 && (
             <div>
               <h2 className="text-xl font-extrabold mb-4">AI Maturity</h2>
 
               <div className="grid md:grid-cols-[1fr_320px] gap-6">
-                {/* slider + explainer */}
                 <div>
                   <label className="lbl mb-2">Where are you today?</label>
                   <input
@@ -381,13 +375,13 @@ export default function Page() {
                     onChange={(e) => setMaturity(parseInt(e.target.value, 10))}
                     className="w-full range-xl"
                   />
-                  <div className="flex justify-between text-[14px] mt-2 text-[#0e1328] font-semibold">
+                  <div className="flex justify-between text-[14px] mt-2 text-white/90 font-semibold">
                     {Array.from({ length: 10 }).map((_, i) => (
                       <span key={i}>{i + 1}</span>
                     ))}
                   </div>
 
-                  <div className="mt-5 p-5 rounded-xl bg-[#f3f6ff] border border-[#dfe6ff]">
+                  <div className="mt-5 p-5 rounded-xl bg-[#0f1633] border border-[#243158]">
                     <div className="text-[15px] font-bold">
                       {maturity}.{" "}
                       {
@@ -405,32 +399,31 @@ export default function Page() {
                         ][maturity - 1]
                       }
                     </div>
-                    <p className="text-[15px] mt-1">
+                    <p className="text-[15px] mt-1 text-white/90">
                       {maturityExplainer(maturity)}
                     </p>
                   </div>
                 </div>
 
-                {/* side box: hours saved */}
-                <div className="rounded-2xl border border-[#e6e9f5] bg-[#fbfcff] p-4">
-                  <div className="text-sm font-semibold text-[#51608e]">
+                <div className="rounded-2xl border border-[#243158] bg-[#0f1633] p-4">
+                  <div className="text-sm font-semibold text-white/70">
                     Estimated hours saved (per week)
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-8">
                     <div>
-                      <div className="text-xs text-[#51608e]">Per person</div>
+                      <div className="text-xs text-white/60">Per person</div>
                       <div className="text-2xl font-extrabold">
                         {maturityHoursPerPerson.toFixed(1)} h
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-[#51608e]">Team</div>
+                      <div className="text-xs text-white/60">Team</div>
                       <div className="text-2xl font-extrabold">
                         {maturityHoursTeam.toLocaleString()} h
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 text-xs text-[#51608e]">
+                  <div className="mt-3 text-xs text-white/60">
                     Based on maturity benchmark mapping. You can refine in the next step.
                   </div>
                 </div>
@@ -447,11 +440,11 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 3 – selection only (no inputs here) */}
+          {/* STEP 3 */}
           {step === 3 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Pick top 3 priorities</h2>
-              <p className="text-sm text-[#51608e] mb-4">
+              <p className="text-sm text-white/70 mb-4">
                 Choose up to three areas to focus your ROI model.
               </p>
 
@@ -483,7 +476,7 @@ export default function Page() {
                           {active ? "Selected" : "Select"}
                         </button>
                       </div>
-                      <div className="text-sm text-[#51608e] mt-1">
+                      <div className="text-sm text-white/70 mt-1">
                         {PRIORITY_META[k].blurb}
                       </div>
                     </div>
@@ -502,11 +495,11 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 4 – Throughput inputs */}
+          {/* STEP 4 */}
           {step === 4 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Throughput</h2>
-              <p className="text-sm text-[#51608e] mb-4">
+              <p className="text-sm text-white/70 mb-4">
                 Quick edit of the assumptions for throughput impact.
               </p>
               <div className="grid md:grid-cols-2 gap-4">
@@ -545,7 +538,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 5 – Retention inputs */}
+          {/* STEP 5 */}
           {step === 5 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Retention</h2>
@@ -589,7 +582,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 6 – Upskilling inputs */}
+          {/* STEP 6 */}
           {step === 6 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Upskilling</h2>
@@ -633,7 +626,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 7 – Results */}
+          {/* STEP 7 */}
           {step === 7 && (
             <div>
               <h2 className="text-xl font-extrabold mb-4">Results</h2>
@@ -664,8 +657,8 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="mt-6 border border-[#e6e9f5] rounded-2xl overflow-hidden">
-                <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold text-[#51608e] bg-[#f8faff]">
+              <div className="mt-6 border border-[#243158] rounded-2xl overflow-hidden">
+                <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold text-white/70 bg-[#0f1633]">
                   <div>PRIORITY</div>
                   <div className="text-right">HOURS SAVED</div>
                   <div className="text-right">ANNUAL VALUE</div>
@@ -677,12 +670,12 @@ export default function Page() {
                     const value = hours * hourlyCost;
                     return (
                       <div
-                        className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t border-[#eef1f8]"
+                        className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t border-[#1f2747]"
                         key={k}
                       >
                         <div>
                           <div className="font-bold">{PRIORITY_META[k].label}</div>
-                          <div className="text-sm text-[#51608e]">
+                          <div className="text-sm text-white/70">
                             {PRIORITY_META[k].blurb}
                           </div>
                         </div>
@@ -696,7 +689,7 @@ export default function Page() {
                       </div>
                     );
                   })}
-                <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t-2 border-[#dfe6ff] bg-[#f8faff]">
+                <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t-2 border-[#2d3a70] bg-[#0f1633]">
                   <div className="font-extrabold">Total</div>
                   <div className="text-right font-extrabold">
                     {(weeklyHoursTotal * 52).toLocaleString()} h
