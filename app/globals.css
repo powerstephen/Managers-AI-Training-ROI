@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #3366fe;
+  --ink: #0b1022;
+}
+
+html, body {
+  @apply bg-soft text-[15px] text-gray-800;
+}
+
+.container-narrow {
+  @apply max-w-6xl mx-auto px-4 md:px-6;
+}
+
+/* Pill stepper */
+.stepper {
+  @apply flex flex-wrap gap-3 items-center w-full bg-white rounded-2xl border border-gray-200 p-3 shadow-soft;
+}
+.stepper .pill {
+  @apply flex items-center gap-2 rounded-full px-3 py-2 border border-gray-200 bg-white;
+}
+.stepper .pill.active {
+  @apply bg-brainBlue text-white border-brainBlue;
+}
+
+/* KPI tiles */
+.kpi {
+  @apply rounded-2xl bg-white border border-gray-200 p-4 shadow-soft;
+}
+.kpi .label {
+  @apply text-gray-500 text-sm;
+}
+.kpi .value {
+  @apply text-2xl font-semibold text-gray-900;
+}
+
+/* Card shell */
+.card {
+  @apply bg-white rounded-2xl border border-gray-200 shadow-soft;
+}
+
+/* Primary button */
+.btn {
+  @apply inline-flex items-center justify-center rounded-full px-4 py-3 font-medium transition;
+}
+.btn-primary {
+  @apply bg-brainBlue text-white hover:opacity-90;
+}
+.btn-ghost {
+  @apply bg-white border border-gray-200 hover:bg-gray-50;
+}
+
+/* Form bits */
+.label {
+  @apply block text-sm font-semibold text-gray-800 mb-2;
+}
+.input, .select {
+  @apply w-full rounded-xl border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brainBlue;
+}
+
+/* Results table */
+.table-head {
+  @apply text-xs uppercase tracking-wide text-gray-500;
+}
+.row {
+  @apply grid grid-cols-12 gap-4 border-t border-gray-200 py-4;
+}
+.row .col-title {
+  @apply col-span-5 font-semibold text-gray-900;
+}
+.row .col-hours {
+  @apply col-span-3 text-gray-800;
+}
+.row .col-value {
+  @apply col-span-4 text-right font-semibold text-gray-900;
+}
