@@ -8,6 +8,36 @@
   }
 }
 
+/* Bigger, nicer range slider (Step 2) */
+input[type="range"].range-lg {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 14px;            /* thicker track */
+  background: #e6e9f5;
+  border-radius: 9999px;
+  outline: none;
+}
+input[type="range"].range-lg::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;             /* larger thumb */
+  height: 24px;
+  border-radius: 9999px;
+  background: #3366fe;
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(51, 102, 254, 0.35);
+  cursor: pointer;
+}
+input[type="range"].range-lg::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: #3366fe;
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(51, 102, 254, 0.35);
+  cursor: pointer;
+}
+
 @layer components {
   .lbl { @apply block text-sm font-semibold text-[#0e1328] mb-1; }
   .hint { @apply text-xs text-[#51608e] mt-1; }
