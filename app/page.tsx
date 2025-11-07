@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-/* ----------------------------- Types / helpers ---------------------------- */
+/* ───────────────────────── Types / helpers ───────────────────────── */
 
 type Currency = "EUR" | "USD" | "GBP" | "AUD";
 const CURRENCY_SYMBOL: Record<Currency, string> = {
@@ -62,10 +62,8 @@ const PRIORITY_META: Record<
   },
 };
 
-// map maturity 1–10 → weekly hours saved per person (baseline suggestion)
+// 1–10 → weekly hours saved per person (baseline)
 const maturityToHours = (level: number) => {
-  // Gentle curve: bigger early wins, tapering later
-  // 1 → 5h/w, 10 → 1h/w
   const clamped = Math.min(10, Math.max(1, level));
   const table = [5, 4.5, 4, 3.5, 3, 2.6, 2.2, 1.8, 1.4, 1];
   return table[clamped - 1];
@@ -88,13 +86,16 @@ const maturityExplainer = (level: number) => {
   return copy[idx];
 };
 
-/* --------------------------------- Page ---------------------------------- */
+/* ───────────────────────────── Page ───────────────────────────── */
 
 export default function Page() {
-  /* ------------------------------- Step state ------------------------------ */
+  /* Steps */
   const [step, setStep] = useState(1);
+  const goNext = () => setStep((s) => Math.min(7, s + 1));
+  const goBack = () => setStep((s) => Math.max(1, s - 1));
+  const startOver = () => window.location.reload();
 
-  // Step 1 – Basics
+  /* Step 1 – Basics */
   const [dept, setDept] = useState<Dept>("Company-wide");
   const [headcount, setHeadcount] = useState<number>(150);
   const [currency, setCurrency] = useState<Currency>("EUR");
@@ -102,10 +103,10 @@ export default function Page() {
   const [trainingPerEmployee, setTrainingPerEmployee] = useState<number>(850);
   const [programMonths, setProgramMonths] = useState<number>(3);
 
-  // Step 2 – AI Maturity
+  /* Step 2 – AI Maturity */
   const [maturity, setMaturity] = useState<number>(5);
 
-  // Step 3 – Priorities (allow 6 options, preselect top 3)
+  /* Step 3 – Priorities (6 options, top 3 preselected) */
   const allPriorityKeys: PriorityKey[] = [
     "throughput",
     "quality",
@@ -118,15 +119,21 @@ export default function Page() {
     allPriorityKeys.filter((k) => PRIORITY_META[k].defaultOn)
   );
 
-  // Step 4–6 simple dials (you can refine later)
+  /* Inline config (shown on cards when selected) */
+  // Throughput
   const [throughputPct, setThroughputPct] = useState(8); // % weekly time reclaimed
+  const [handoffPct, setHandoffPct] = useState(6); // % wait/handoff time reduced
+
+  // Retention
   const [retentionLiftPct, setRetentionLiftPct] = useState(2); // % attrition avoided
-  const [upskillCoveragePct, setUpskillCoveragePct] = useState(60); // % of team competent
+  const [baselineAttritionPct, setBaselineAttritionPct] = useState(12); // org attrition
 
-  /* ------------------------------ Calculations ----------------------------- */
+  // Upskilling
+  const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
+  const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
 
+  /* Calcs */
   const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
-
   const maturityHoursPerPerson = useMemo(
     () => maturityToHours(maturity),
     [maturity]
@@ -136,30 +143,55 @@ export default function Page() {
     [maturityHoursPerPerson, headcount]
   );
 
-  // Simple illustrative value mapping per priority (weekly team hours)
-  const weeklyHoursByPriority = useMemo(() => {
-    const hpp = maturityHoursPerPerson; // hours per person / week baseline
-    const base = hpp * headcount; // total team baseline hours
+  // base team hours from maturity mapping
+  const baseWeeklyTeamHours = useMemo(
+    () => maturityHoursPerPerson * headcount,
+    [maturityHoursPerPerson, headcount]
+  );
 
+  // Weekly hours per selected priority (simple illustrative models)
+  const weeklyHoursByPriority = useMemo(() => {
     const entries: Record<PriorityKey, number> = {
-      throughput:
-        selected.includes("throughput") ? Math.round(base * (throughputPct / 100)) : 0,
-      quality: selected.includes("quality") ? Math.round(base * 0.2) : 0,
-      onboarding: selected.includes("onboarding") ? Math.round(headcount * 0.3) : 0,
-      retention: selected.includes("retention") ? Math.round(headcount * (retentionLiftPct / 100) * 4) : 0,
-      upskilling: selected.includes("upskilling")
-        ? Math.round((upskillCoveragePct / 100) * headcount * 0.5)
+      throughput: selected.includes("throughput")
+        ? Math.round(baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100))
         : 0,
-      costAvoidance: selected.includes("costAvoidance") ? Math.round(base * 0.1) : 0,
+
+      quality: selected.includes("quality")
+        ? Math.round(baseWeeklyTeamHours * 0.2) // fixed demo weight
+        : 0,
+
+      onboarding: selected.includes("onboarding")
+        ? Math.round((Math.max(0, Math.min(52, 2)) * 40) * (headcount * 0.2)) // demo: ~20% new hires/yr * 2 weeks * 40h
+        : 0,
+
+      retention: selected.includes("retention")
+        ? Math.round(
+            ((headcount * (baselineAttritionPct / 100)) * // expected departures
+              (retentionLiftPct / 100) * // avoided share
+              120) / // assume 120h “burden” per avoided departure
+              52
+          )
+        : 0,
+
+      upskilling: selected.includes("upskilling")
+        ? Math.round((upskillCoveragePct / 100) * headcount * upskillHoursPerWeek)
+        : 0,
+
+      costAvoidance: selected.includes("costAvoidance")
+        ? Math.round(baseWeeklyTeamHours * 0.1)
+        : 0,
     };
     return entries;
   }, [
-    headcount,
-    maturityHoursPerPerson,
     selected,
+    baseWeeklyTeamHours,
     throughputPct,
+    handoffPct,
+    headcount,
     retentionLiftPct,
+    baselineAttritionPct,
     upskillCoveragePct,
+    upskillHoursPerWeek,
   ]);
 
   const weeklyHoursTotal = useMemo(
@@ -171,12 +203,10 @@ export default function Page() {
     () => weeklyHoursTotal * hourlyCost * 4,
     [weeklyHoursTotal, hourlyCost]
   );
-
   const programCost = useMemo(
     () => headcount * trainingPerEmployee,
     [headcount, trainingPerEmployee]
   );
-
   const annualValue = useMemo(() => monthlyValue * 12, [monthlyValue]);
   const annualROI = useMemo(
     () => (programCost === 0 ? 0 : annualValue / programCost),
@@ -187,13 +217,7 @@ export default function Page() {
     [programCost, monthlyValue]
   );
 
-  /* --------------------------------- UI bits -------------------------------- */
-
   const symbol = CURRENCY_SYMBOL[currency];
-
-  const goNext = () => setStep((s) => Math.min(7, s + 1));
-  const goBack = () => setStep((s) => Math.max(1, s - 1));
-  const startOver = () => window.location.reload();
 
   const stepItems = [
     { id: 1, label: "Basics" },
@@ -205,16 +229,16 @@ export default function Page() {
     { id: 7, label: "Results" },
   ];
 
-  /* --------------------------------- Render -------------------------------- */
+  /* ───────────────────────────── Render ───────────────────────────── */
 
   return (
     <div className="min-h-screen bg-[#f6f8fc] text-[#0e1328]">
-      {/* HERO (image replaces the old blue header) */}
+      {/* HERO (keeps native aspect ratio; no stretch) */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
         <img
           src="/hero.png"
           alt="AI at Work — Brainster"
-          className="w-full h-[220px] md:h-[260px] lg:h-[300px] object-cover rounded-2xl shadow-[0_4px_24px_rgba(2,6,23,0.15)]"
+          className="w-full h-auto object-contain rounded-2xl shadow-[0_4px_24px_rgba(2,6,23,0.15)]"
         />
       </div>
 
@@ -239,7 +263,7 @@ export default function Page() {
       {/* Card frame */}
       <div className="w-full max-w-6xl mx-auto px-4 mt-4 pb-16">
         <div className="bg-white rounded-2xl shadow-soft p-6 md:p-8">
-          {/* STEP CONTENTS */}
+          {/* STEP 1 */}
           {step === 1 && (
             <div>
               <h2 className="text-xl font-extrabold mb-4">Team</h2>
@@ -294,10 +318,12 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4 mt-6">
+              {/* Program cost assumptions heading + three inputs */}
+              <h3 className="text-lg font-bold mt-8 mb-2">Program cost assumptions</h3>
+              <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <label className="lbl">
-                    Program cost assumptions — Average annual salary ({symbol})
+                    Average annual salary ({symbol})
                   </label>
                   <input
                     className="inp"
@@ -341,6 +367,7 @@ export default function Page() {
             </div>
           )}
 
+          {/* STEP 2 */}
           {step === 2 && (
             <div>
               <h2 className="text-xl font-extrabold mb-4">AI Maturity</h2>
@@ -364,10 +391,26 @@ export default function Page() {
                   </div>
 
                   <div className="mt-4 p-4 rounded-xl bg-[#f3f6ff] border border-[#dfe6ff]">
-                    <div className="text-sm font-semibold">
-                      {maturity}. {["Early","Exploring","Emerging","Forming","Defined","Adopted","Integrated","Scaled","Optimized","Embedded"][maturity-1]}
+                    <div className="text-[13.5px] font-semibold">
+                      {maturity}.{" "}
+                      {
+                        [
+                          "Early",
+                          "Exploring",
+                          "Emerging",
+                          "Forming",
+                          "Defined",
+                          "Adopted",
+                          "Integrated",
+                          "Scaled",
+                          "Optimized",
+                          "Embedded",
+                        ][maturity - 1]
+                      }
                     </div>
-                    <p className="text-sm mt-1">{maturityExplainer(maturity)}</p>
+                    <p className="text-[13.5px] mt-1">
+                      {maturityExplainer(maturity)}
+                    </p>
                   </div>
                 </div>
 
@@ -391,7 +434,7 @@ export default function Page() {
                     </div>
                   </div>
                   <div className="mt-3 text-xs text-[#51608e]">
-                    Based on maturity benchmark mapping. You can refine in later steps.
+                    Based on maturity benchmark mapping. You can refine in the next step.
                   </div>
                 </div>
               </div>
@@ -407,11 +450,12 @@ export default function Page() {
             </div>
           )}
 
+          {/* STEP 3 */}
           {step === 3 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Pick top 3 priorities</h2>
               <p className="text-sm text-[#51608e] mb-4">
-                Choose up to three areas to focus your business case.
+                Choose up to three areas and set quick assumptions (each card has 2 inputs when selected).
               </p>
 
               <div className="grid md:grid-cols-3 gap-3">
@@ -419,15 +463,8 @@ export default function Page() {
                   const active = selected.includes(k);
                   const disabled = !active && selected.length >= 3;
                   return (
-                    <button
+                    <div
                       key={k}
-                      onClick={() => {
-                        if (active) {
-                          setSelected(selected.filter((x) => x !== k));
-                        } else if (!disabled) {
-                          setSelected([...selected, k]);
-                        }
-                      }}
                       className={`priority ${active ? "priority--active" : ""} ${
                         disabled ? "opacity-40 cursor-not-allowed" : ""
                       }`}
@@ -436,16 +473,125 @@ export default function Page() {
                         <span className="font-semibold">
                           {PRIORITY_META[k].label}
                         </span>
-                        {active ? (
-                          <span className="tag">Selected</span>
-                        ) : (
-                          <span className="tag tag--ghost">Tap to select</span>
-                        )}
+                        <button
+                          onClick={() => {
+                            if (active) {
+                              setSelected(selected.filter((x) => x !== k));
+                            } else if (!disabled) {
+                              setSelected([...selected, k]);
+                            }
+                          }}
+                          className={`tag ${active ? "" : "tag--ghost"}`}
+                        >
+                          {active ? "Selected" : "Select"}
+                        </button>
                       </div>
                       <div className="text-sm text-[#51608e] mt-1">
                         {PRIORITY_META[k].blurb}
                       </div>
-                    </button>
+
+                      {/* Inline config for the 3 configurable priorities */}
+                      {active && k === "throughput" && (
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+                          <div>
+                            <label className="lbl">Time reclaimed %</label>
+                            <input
+                              className="inp"
+                              type="number"
+                              min={0}
+                              max={30}
+                              value={throughputPct}
+                              onChange={(e) =>
+                                setThroughputPct(parseInt(e.target.value || "0", 10))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="lbl">Handoffs reduced %</label>
+                            <input
+                              className="inp"
+                              type="number"
+                              min={0}
+                              max={30}
+                              value={handoffPct}
+                              onChange={(e) =>
+                                setHandoffPct(parseInt(e.target.value || "0", 10))
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {active && k === "retention" && (
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+                          <div>
+                            <label className="lbl">Attrition avoided %</label>
+                            <input
+                              className="inp"
+                              type="number"
+                              min={0}
+                              max={30}
+                              value={retentionLiftPct}
+                              onChange={(e) =>
+                                setRetentionLiftPct(
+                                  parseInt(e.target.value || "0", 10)
+                                )
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="lbl">Baseline attrition %</label>
+                            <input
+                              className="inp"
+                              type="number"
+                              min={0}
+                              max={40}
+                              value={baselineAttritionPct}
+                              onChange={(e) =>
+                                setBaselineAttritionPct(
+                                  parseInt(e.target.value || "0", 10)
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {active && k === "upskilling" && (
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+                          <div>
+                            <label className="lbl">Coverage target %</label>
+                            <input
+                              className="inp"
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={upskillCoveragePct}
+                              onChange={(e) =>
+                                setUpskillCoveragePct(
+                                  parseInt(e.target.value || "0", 10)
+                                )
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="lbl">Hours / week per person</label>
+                            <input
+                              className="inp"
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={upskillHoursPerWeek}
+                              onChange={(e) =>
+                                setUpskillHoursPerWeek(
+                                  parseFloat(e.target.value || "0")
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -461,21 +607,38 @@ export default function Page() {
             </div>
           )}
 
+          {/* STEP 4–6 kept for quick edits (labels only) */}
           {step === 4 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Throughput</h2>
               <p className="text-sm text-[#51608e] mb-4">
-                Estimated weekly time reclaimed via shorter cycles.
+                Quick edit of the assumptions you set in priorities.
               </p>
-              <label className="lbl">% of weekly time reclaimed</label>
-              <input
-                className="inp"
-                type="number"
-                min={0}
-                max={30}
-                value={throughputPct}
-                onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))}
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="lbl">Time reclaimed %</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={throughputPct}
+                    onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))}
+                  />
+                </div>
+                <div>
+                  <label className="lbl">Handoffs reduced %</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={handoffPct}
+                    onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))}
+                  />
+                </div>
+              </div>
+
               <div className="mt-6 flex justify-end gap-3">
                 <button className="btn--ghost" onClick={goBack}>
                   ← Back
@@ -490,20 +653,35 @@ export default function Page() {
           {step === 5 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Retention</h2>
-              <p className="text-sm text-[#51608e] mb-4">
-                % attrition avoided thanks to better tools / work satisfaction.
-              </p>
-              <label className="lbl">% attrition avoided</label>
-              <input
-                className="inp"
-                type="number"
-                min={0}
-                max={20}
-                value={retentionLiftPct}
-                onChange={(e) =>
-                  setRetentionLiftPct(parseInt(e.target.value || "0", 10))
-                }
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="lbl">Attrition avoided %</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={retentionLiftPct}
+                    onChange={(e) =>
+                      setRetentionLiftPct(parseInt(e.target.value || "0", 10))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="lbl">Baseline attrition %</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={40}
+                    value={baselineAttritionPct}
+                    onChange={(e) =>
+                      setBaselineAttritionPct(parseInt(e.target.value || "0", 10))
+                    }
+                  />
+                </div>
+              </div>
+
               <div className="mt-6 flex justify-end gap-3">
                 <button className="btn--ghost" onClick={goBack}>
                   ← Back
@@ -518,20 +696,35 @@ export default function Page() {
           {step === 6 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Upskilling</h2>
-              <p className="text-sm text-[#51608e] mb-4">
-                Target competency coverage across the in-scope team.
-              </p>
-              <label className="lbl">Coverage target (%)</label>
-              <input
-                className="inp"
-                type="number"
-                min={0}
-                max={100}
-                value={upskillCoveragePct}
-                onChange={(e) =>
-                  setUpskillCoveragePct(parseInt(e.target.value || "0", 10))
-                }
-              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="lbl">Coverage target %</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={upskillCoveragePct}
+                    onChange={(e) =>
+                      setUpskillCoveragePct(parseInt(e.target.value || "0", 10))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="lbl">Hours / week per person</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={upskillHoursPerWeek}
+                    onChange={(e) =>
+                      setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))
+                    }
+                  />
+                </div>
+              </div>
+
               <div className="mt-6 flex justify-end gap-3">
                 <button className="btn--ghost" onClick={goBack}>
                   ← Back
@@ -543,6 +736,7 @@ export default function Page() {
             </div>
           )}
 
+          {/* STEP 7 – Results */}
           {step === 7 && (
             <div>
               <h2 className="text-xl font-extrabold mb-4">Results</h2>
@@ -590,9 +784,7 @@ export default function Page() {
                         key={k}
                       >
                         <div>
-                          <div className="font-bold">
-                            {PRIORITY_META[k].label}
-                          </div>
+                          <div className="font-bold">{PRIORITY_META[k].label}</div>
                           <div className="text-sm text-[#51608e]">
                             {PRIORITY_META[k].blurb}
                           </div>
