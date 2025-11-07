@@ -123,11 +123,9 @@ export default function Page() {
   // Throughput
   const [throughputPct, setThroughputPct] = useState(8); // % weekly time reclaimed
   const [handoffPct, setHandoffPct] = useState(6); // % wait/handoff time reduced
-
   // Retention
   const [retentionLiftPct, setRetentionLiftPct] = useState(2); // % attrition avoided
   const [baselineAttritionPct, setBaselineAttritionPct] = useState(12); // org attrition
-
   // Upskilling
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
@@ -157,19 +155,18 @@ export default function Page() {
         : 0,
 
       quality: selected.includes("quality")
-        ? Math.round(baseWeeklyTeamHours * 0.2) // fixed demo weight
+        ? Math.round(baseWeeklyTeamHours * 0.2)
         : 0,
 
       onboarding: selected.includes("onboarding")
-        ? Math.round((Math.max(0, Math.min(52, 2)) * 40) * (headcount * 0.2)) // demo: ~20% new hires/yr * 2 weeks * 40h
+        ? Math.round((Math.max(0, Math.min(52, 2)) * 40) * (headcount * 0.2))
         : 0,
 
       retention: selected.includes("retention")
         ? Math.round(
-            ((headcount * (baselineAttritionPct / 100)) * // expected departures
-              (retentionLiftPct / 100) * // avoided share
-              120) / // assume 120h “burden” per avoided departure
-              52
+            ((headcount * (baselineAttritionPct / 100)) *
+              (retentionLiftPct / 100) *
+              120) / 52
           )
         : 0,
 
@@ -233,12 +230,12 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#f6f8fc] text-[#0e1328]">
-      {/* HERO (shorter height cap; keeps ratio) */}
-      <div className="w-full max-w-6xl mx-auto px-4 pt-6">
+      {/* FULL-BLEED HERO (no side gutters, keeps aspect) */}
+      <div className="w-screen overflow-hidden">
         <img
           src="/hero.png"
           alt="AI at Work — Brainster"
-          className="w-full h-auto max-h-[210px] object-contain rounded-2xl shadow-[0_4px_24px_rgba(2,6,23,0.15)]"
+          className="block w-full h-[220px] md:h-[280px] lg:h-[320px] object-cover"
         />
       </div>
 
@@ -382,16 +379,16 @@ export default function Page() {
                     max={10}
                     value={maturity}
                     onChange={(e) => setMaturity(parseInt(e.target.value, 10))}
-                    className="w-full range-lg"
+                    className="w-full range-xl"
                   />
-                  <div className="flex justify-between text-[13px] mt-2 text-[#51608e] font-semibold">
+                  <div className="flex justify-between text-[14px] mt-2 text-[#0e1328] font-semibold">
                     {Array.from({ length: 10 }).map((_, i) => (
                       <span key={i}>{i + 1}</span>
                     ))}
                   </div>
 
                   <div className="mt-5 p-5 rounded-xl bg-[#f3f6ff] border border-[#dfe6ff]">
-                    <div className="text-[14px] font-bold">
+                    <div className="text-[15px] font-bold">
                       {maturity}.{" "}
                       {
                         [
@@ -408,7 +405,7 @@ export default function Page() {
                         ][maturity - 1]
                       }
                     </div>
-                    <p className="text-[14px] mt-1">
+                    <p className="text-[15px] mt-1">
                       {maturityExplainer(maturity)}
                     </p>
                   </div>
@@ -709,24 +706,6 @@ export default function Page() {
                     {Math.round(annualValue).toLocaleString()}
                   </div>
                 </div>
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-[#e6e9f5] bg-[#fbfcff] p-4">
-                <div className="text-sm font-bold mb-2">Next steps</div>
-                <ul className="list-disc pl-5 text-sm text-[#1b2559] space-y-1">
-                  <li>
-                    Map top 3 workflows → ship prompt templates & QA/guardrails within
-                    2 weeks.
-                  </li>
-                  <li>
-                    Launch “AI Champions” cohort; set quarterly ROI reviews; track usage
-                    to correlate with retention.
-                  </li>
-                  <li>
-                    Set competency coverage target to {upskillCoveragePct}% and measure
-                    weekly AI-in-task usage.
-                  </li>
-                </ul>
               </div>
 
               <div className="mt-6 flex justify-between">
