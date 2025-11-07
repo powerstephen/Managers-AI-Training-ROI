@@ -106,7 +106,7 @@ export default function Page() {
   /* Step 2 – AI Maturity */
   const [maturity, setMaturity] = useState<number>(5);
 
-  /* Step 3 – Priorities (6 options, top 3 preselected) */
+  /* Step 3 – Priorities (selection only; 6 options; top 3 preselected) */
   const allPriorityKeys: PriorityKey[] = [
     "throughput",
     "quality",
@@ -119,7 +119,7 @@ export default function Page() {
     allPriorityKeys.filter((k) => PRIORITY_META[k].defaultOn)
   );
 
-  /* Inline config (shown on cards when selected) */
+  /* Config that lives ONLY on steps 4–6 */
   // Throughput
   const [throughputPct, setThroughputPct] = useState(8); // % weekly time reclaimed
   const [handoffPct, setHandoffPct] = useState(6); // % wait/handoff time reduced
@@ -233,12 +233,12 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#f6f8fc] text-[#0e1328]">
-      {/* HERO (keeps native aspect ratio; no stretch) */}
+      {/* HERO (shorter height cap; keeps ratio) */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
         <img
           src="/hero.png"
           alt="AI at Work — Brainster"
-          className="w-full h-auto object-contain rounded-2xl shadow-[0_4px_24px_rgba(2,6,23,0.15)]"
+          className="w-full h-auto max-h-[210px] object-contain rounded-2xl shadow-[0_4px_24px_rgba(2,6,23,0.15)]"
         />
       </div>
 
@@ -318,7 +318,7 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Program cost assumptions heading + three inputs */}
+              {/* Program cost assumptions */}
               <h3 className="text-lg font-bold mt-8 mb-2">Program cost assumptions</h3>
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
@@ -367,7 +367,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 2 */}
+          {/* STEP 2 – bigger slider + side box */}
           {step === 2 && (
             <div>
               <h2 className="text-xl font-extrabold mb-4">AI Maturity</h2>
@@ -382,16 +382,16 @@ export default function Page() {
                     max={10}
                     value={maturity}
                     onChange={(e) => setMaturity(parseInt(e.target.value, 10))}
-                    className="w-full"
+                    className="w-full range-lg"
                   />
-                  <div className="flex justify-between text-xs mt-1 text-[#51608e]">
+                  <div className="flex justify-between text-[13px] mt-2 text-[#51608e] font-semibold">
                     {Array.from({ length: 10 }).map((_, i) => (
                       <span key={i}>{i + 1}</span>
                     ))}
                   </div>
 
-                  <div className="mt-4 p-4 rounded-xl bg-[#f3f6ff] border border-[#dfe6ff]">
-                    <div className="text-[13.5px] font-semibold">
+                  <div className="mt-5 p-5 rounded-xl bg-[#f3f6ff] border border-[#dfe6ff]">
+                    <div className="text-[14px] font-bold">
                       {maturity}.{" "}
                       {
                         [
@@ -408,7 +408,7 @@ export default function Page() {
                         ][maturity - 1]
                       }
                     </div>
-                    <p className="text-[13.5px] mt-1">
+                    <p className="text-[14px] mt-1">
                       {maturityExplainer(maturity)}
                     </p>
                   </div>
@@ -450,12 +450,12 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 3 */}
+          {/* STEP 3 – selection only (no inputs here) */}
           {step === 3 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Pick top 3 priorities</h2>
               <p className="text-sm text-[#51608e] mb-4">
-                Choose up to three areas and set quick assumptions (each card has 2 inputs when selected).
+                Choose up to three areas to focus your ROI model.
               </p>
 
               <div className="grid md:grid-cols-3 gap-3">
@@ -489,108 +489,6 @@ export default function Page() {
                       <div className="text-sm text-[#51608e] mt-1">
                         {PRIORITY_META[k].blurb}
                       </div>
-
-                      {/* Inline config for the 3 configurable priorities */}
-                      {active && k === "throughput" && (
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                          <div>
-                            <label className="lbl">Time reclaimed %</label>
-                            <input
-                              className="inp"
-                              type="number"
-                              min={0}
-                              max={30}
-                              value={throughputPct}
-                              onChange={(e) =>
-                                setThroughputPct(parseInt(e.target.value || "0", 10))
-                              }
-                            />
-                          </div>
-                          <div>
-                            <label className="lbl">Handoffs reduced %</label>
-                            <input
-                              className="inp"
-                              type="number"
-                              min={0}
-                              max={30}
-                              value={handoffPct}
-                              onChange={(e) =>
-                                setHandoffPct(parseInt(e.target.value || "0", 10))
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {active && k === "retention" && (
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                          <div>
-                            <label className="lbl">Attrition avoided %</label>
-                            <input
-                              className="inp"
-                              type="number"
-                              min={0}
-                              max={30}
-                              value={retentionLiftPct}
-                              onChange={(e) =>
-                                setRetentionLiftPct(
-                                  parseInt(e.target.value || "0", 10)
-                                )
-                              }
-                            />
-                          </div>
-                          <div>
-                            <label className="lbl">Baseline attrition %</label>
-                            <input
-                              className="inp"
-                              type="number"
-                              min={0}
-                              max={40}
-                              value={baselineAttritionPct}
-                              onChange={(e) =>
-                                setBaselineAttritionPct(
-                                  parseInt(e.target.value || "0", 10)
-                                )
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {active && k === "upskilling" && (
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                          <div>
-                            <label className="lbl">Coverage target %</label>
-                            <input
-                              className="inp"
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={upskillCoveragePct}
-                              onChange={(e) =>
-                                setUpskillCoveragePct(
-                                  parseInt(e.target.value || "0", 10)
-                                )
-                              }
-                            />
-                          </div>
-                          <div>
-                            <label className="lbl">Hours / week per person</label>
-                            <input
-                              className="inp"
-                              type="number"
-                              min={0}
-                              step={0.1}
-                              value={upskillHoursPerWeek}
-                              onChange={(e) =>
-                                setUpskillHoursPerWeek(
-                                  parseFloat(e.target.value || "0")
-                                )
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -607,12 +505,12 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 4–6 kept for quick edits (labels only) */}
+          {/* STEP 4 – Throughput inputs */}
           {step === 4 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Throughput</h2>
               <p className="text-sm text-[#51608e] mb-4">
-                Quick edit of the assumptions you set in priorities.
+                Quick edit of the assumptions for throughput impact.
               </p>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -650,6 +548,7 @@ export default function Page() {
             </div>
           )}
 
+          {/* STEP 5 – Retention inputs */}
           {step === 5 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Retention</h2>
@@ -693,6 +592,7 @@ export default function Page() {
             </div>
           )}
 
+          {/* STEP 6 – Upskilling inputs */}
           {step === 6 && (
             <div>
               <h2 className="text-xl font-extrabold mb-2">Upskilling</h2>
