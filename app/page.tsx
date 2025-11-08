@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 
-/* Types & constants */
+/* =========================
+   Types & constants
+========================= */
 type Currency = "EUR" | "USD" | "GBP" | "AUD";
 const CURRENCY_SYMBOL: Record<Currency, string> = {
   EUR: "€",
@@ -79,13 +81,16 @@ const maturityExplainer = [
   "Embedded: >80% coverage; evals/guardrails; continuous improvement.",
 ];
 
+/* =========================
+   Component
+========================= */
 export default function Page() {
   const [step, setStep] = useState(1);
   const next = () => setStep((s) => Math.min(7, s + 1));
   const back = () => setStep((s) => Math.max(1, s - 1));
   const reset = () => window.location.reload();
 
-  /* Step 1 */
+  /* Step 1 — Team & Costs */
   const [dept, setDept] = useState<Dept>("Company-wide");
   const [headcount, setHeadcount] = useState(150);
   const [currency, setCurrency] = useState<Currency>("EUR");
@@ -93,10 +98,10 @@ export default function Page() {
   const [trainingPerEmployee, setTrainingPerEmployee] = useState(850);
   const [programMonths, setProgramMonths] = useState(3);
 
-  /* Step 2 */
+  /* Step 2 — AI Maturity */
   const [maturity, setMaturity] = useState(5);
 
-  /* Step 3 */
+  /* Step 3 — Priorities */
   const keys: PriorityKey[] = [
     "throughput",
     "quality",
@@ -109,13 +114,24 @@ export default function Page() {
     keys.filter((k) => PRIORITY_META[k].defaultOn)
   );
 
-  /* Step 4–6 config */
+  /* Steps 4–6 — Config (kept simple) */
+  // Throughput
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
+
+  // Retention
   const [retentionLiftPct, setRetentionLiftPct] = useState(2);
   const [baselineAttritionPct, setBaselineAttritionPct] = useState(12);
+
+  // Upskilling
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
+
+  // NEW: Global estimate level (applies to all areas)
+  const [estimateLevel, setEstimateLevel] = useState<"low" | "average" | "high">(
+    "average"
+  );
+  const scale = estimateLevel === "low" ? 0.6 : estimateLevel === "high" ? 1.4 : 1;
 
   /* Calcs */
   const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
@@ -132,31 +148,51 @@ export default function Page() {
     [maturityHoursPerPerson, headcount]
   );
 
+  /* --- Weekly hours by priority (realistic onboarding model + estimate scaling) --- */
   const weeklyHours = useMemo(() => {
+    // Onboarding: hires/year * weeks_saved_per_hire * 40 / 52
+    // Assumptions: turnover ~10% of HC, 2 weeks saved per new hire (reasonable default).
+    const hiresPerYear = headcount * 0.1;
+    const weeksSavedPerHire = 2;
+    const onboardingWeekly =
+      (hiresPerYear * weeksSavedPerHire * 40) / 52; // -> weekly hours
+
     const v: Record<PriorityKey, number> = {
       throughput: selected.includes("throughput")
-        ? Math.round(baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100))
-        : 0,
-      quality: selected.includes("quality")
-        ? Math.round(baseWeeklyTeamHours * 0.2)
-        : 0,
-      onboarding: selected.includes("onboarding")
-        ? Math.round((Math.max(0, Math.min(52, 2)) * 40) * (headcount * 0.2)) // weeklyized below
-        : 0,
-      retention: selected.includes("retention")
         ? Math.round(
-            ((headcount * (baselineAttritionPct / 100)) *
-              (retentionLiftPct / 100) *
-              120) / 52
+            baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100) * scale
           )
         : 0,
-      upskilling: selected.includes("upskilling")
-        ? Math.round((upskillCoveragePct / 100) * headcount * upskillHoursPerWeek)
+
+      quality: selected.includes("quality")
+        ? Math.round(baseWeeklyTeamHours * 0.2 * scale)
         : 0,
+
+      onboarding: selected.includes("onboarding")
+        ? Math.round(onboardingWeekly * scale)
+        : 0,
+
+      retention: selected.includes("retention")
+        ? Math.round(
+            // avoided attrition -> retained employees * 120 saved hours each / 52
+            ((headcount * (baselineAttritionPct / 100)) *
+              (retentionLiftPct / 100) *
+              120 *
+              scale) / 52
+          )
+        : 0,
+
+      upskilling: selected.includes("upskilling")
+        ? Math.round(
+            (upskillCoveragePct / 100) * headcount * upskillHoursPerWeek * scale
+          )
+        : 0,
+
       costAvoidance: selected.includes("costAvoidance")
-        ? Math.round(baseWeeklyTeamHours * 0.1)
+        ? Math.round(baseWeeklyTeamHours * 0.1 * scale)
         : 0,
     };
+
     return v;
   }, [
     selected,
@@ -168,13 +204,17 @@ export default function Page() {
     baselineAttritionPct,
     upskillCoveragePct,
     upskillHoursPerWeek,
+    scale,
   ]);
 
   const weeklyTotal = useMemo(
     () => Object.values(weeklyHours).reduce((a, b) => a + b, 0),
     [weeklyHours]
   );
-  const monthlyValue = useMemo(() => weeklyTotal * hourlyCost * 4, [weeklyTotal, hourlyCost]);
+  const monthlyValue = useMemo(
+    () => weeklyTotal * hourlyCost * 4,
+    [weeklyTotal, hourlyCost]
+  );
   const programCost = useMemo(
     () => headcount * trainingPerEmployee,
     [headcount, trainingPerEmployee]
@@ -202,10 +242,17 @@ export default function Page() {
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg-page)", color: "var(--text)" }}>
-      {/* HERO — same width as content, no zoom */}
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--bg-page)", color: "var(--text)" }}
+    >
+      {/* HERO — same width as content */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
-        <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft" />
+        <img
+          src="/hero.png"
+          alt="AI at Work — Brainster"
+          className="hero-img shadow-soft"
+        />
       </div>
 
       {/* Progress */}
@@ -213,7 +260,11 @@ export default function Page() {
         <div className="panel flex gap-4 flex-wrap">
           {steps.map((s) => (
             <div key={s.id} className="flex items-center gap-2">
-              <span className={`step-chip ${step >= s.id ? "step-chip--on" : "step-chip--off"}`}>
+              <span
+                className={`step-chip ${
+                  step >= s.id ? "step-chip--on" : "step-chip--off"
+                }`}
+              >
                 {s.id}
               </span>
               <span className="step-label">{s.label}</span>
@@ -261,7 +312,9 @@ export default function Page() {
                     className="inp"
                     type="number"
                     value={headcount}
-                    onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setHeadcount(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
 
@@ -281,25 +334,35 @@ export default function Page() {
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold mt-8 mb-2">Program cost assumptions</h3>
+              <h3 className="text-lg font-bold mt-8 mb-2">
+                Program cost assumptions
+              </h3>
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="card">
-                  <label className="lbl">Average annual salary ({symbol})</label>
+                  <label className="lbl">
+                    Average annual salary ({symbol})
+                  </label>
                   <input
                     className="inp"
                     type="number"
                     value={avgSalary}
-                    onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setAvgSalary(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
                 <div className="card">
-                  <label className="lbl">Training per employee ({symbol})</label>
+                  <label className="lbl">
+                    Training per employee ({symbol})
+                  </label>
                   <input
                     className="inp"
                     type="number"
                     value={trainingPerEmployee}
                     onChange={(e) =>
-                      setTrainingPerEmployee(parseInt(e.target.value || "0", 10))
+                      setTrainingPerEmployee(
+                        parseInt(e.target.value || "0", 10)
+                      )
                     }
                   />
                 </div>
@@ -309,7 +372,9 @@ export default function Page() {
                     className="inp"
                     type="number"
                     value={programMonths}
-                    onChange={(e) => setProgramMonths(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setProgramMonths(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
               </div>
@@ -355,7 +420,9 @@ export default function Page() {
                 </div>
 
                 <div className="card">
-                  <div className="text-sm font-semibold muted">Estimated hours saved</div>
+                  <div className="text-sm font-semibold muted">
+                    Estimated hours saved
+                  </div>
                   <div className="grid grid-cols-2 gap-4 mt-3">
                     <div className="card">
                       <div className="text-xs muted">Per employee / week</div>
@@ -387,11 +454,13 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 3: Priorities (selection only) */}
+          {/* STEP 3: Priorities */}
           {step === 3 && (
             <div>
               <h2 className="title">Pick top 3 priorities</h2>
-              <p className="muted text-sm mb-4">Choose up to three areas to focus your ROI model.</p>
+              <p className="muted text-sm mb-4">
+                Choose up to three areas to focus your ROI model.
+              </p>
               <div className="grid md:grid-cols-3 gap-3">
                 {keys.map((k) => {
                   const active = selected.includes(k);
@@ -399,25 +468,32 @@ export default function Page() {
                   return (
                     <div
                       key={k}
-                      className={`priority ${active ? "priority--active" : ""} ${
-                        disabled ? "opacity-40 cursor-not-allowed" : ""
-                      }`}
+                      className={`priority ${
+                        active ? "priority--active" : ""
+                      } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold">{PRIORITY_META[k].label}</span>
+                        <span className="font-semibold">
+                          {PRIORITY_META[k].label}
+                        </span>
                         <button
                           onClick={() => {
-                            if (active) setSelected(selected.filter((x) => x !== k));
+                            if (active)
+                              setSelected(selected.filter((x) => x !== k));
                             else if (!disabled) setSelected([...selected, k]);
                           }}
                           className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                            active ? "bg-[var(--bg-chip)] text-white" : "bg-[#22252c] text-white"
+                            active
+                              ? "bg-[var(--bg-chip)] text-white"
+                              : "bg-[#22252c] text-white"
                           }`}
                         >
                           {active ? "Selected" : "Select"}
                         </button>
                       </div>
-                      <div className="text-sm muted mt-1">{PRIORITY_META[k].blurb}</div>
+                      <div className="text-sm muted mt-1">
+                        {PRIORITY_META[k].blurb}
+                      </div>
                     </div>
                   );
                 })}
@@ -438,7 +514,10 @@ export default function Page() {
           {step === 4 && (
             <div>
               <h2 className="title">Throughput</h2>
-              <p className="muted text-sm mb-4">Quick edit of assumptions for throughput impact.</p>
+              <p className="muted text-sm mb-4">
+                Quick edit of assumptions for throughput impact.
+              </p>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
                   <label className="lbl">Time reclaimed %</label>
@@ -448,7 +527,9 @@ export default function Page() {
                     min={0}
                     max={30}
                     value={throughputPct}
-                    onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setThroughputPct(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
                 <div className="card">
@@ -459,8 +540,25 @@ export default function Page() {
                     min={0}
                     max={30}
                     value={handoffPct}
-                    onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setHandoffPct(parseInt(e.target.value || "0", 10))
+                    }
                   />
+                </div>
+
+                <div className="card">
+                  <label className="lbl">Estimate level</label>
+                  <select
+                    className="inp"
+                    value={estimateLevel}
+                    onChange={(e) =>
+                      setEstimateLevel(e.target.value as "low" | "average" | "high")
+                    }
+                  >
+                    <option value="low">Low (conservative)</option>
+                    <option value="average">Average</option>
+                    <option value="high">High (optimistic)</option>
+                  </select>
                 </div>
               </div>
 
@@ -488,7 +586,9 @@ export default function Page() {
                     min={0}
                     max={30}
                     value={retentionLiftPct}
-                    onChange={(e) => setRetentionLiftPct(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setRetentionLiftPct(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
                 <div className="card">
@@ -503,6 +603,21 @@ export default function Page() {
                       setBaselineAttritionPct(parseInt(e.target.value || "0", 10))
                     }
                   />
+                </div>
+
+                <div className="card">
+                  <label className="lbl">Estimate level</label>
+                  <select
+                    className="inp"
+                    value={estimateLevel}
+                    onChange={(e) =>
+                      setEstimateLevel(e.target.value as "low" | "average" | "high")
+                    }
+                  >
+                    <option value="low">Low (conservative)</option>
+                    <option value="average">Average</option>
+                    <option value="high">High (optimistic)</option>
+                  </select>
                 </div>
               </div>
 
@@ -543,8 +658,25 @@ export default function Page() {
                     min={0}
                     step={0.1}
                     value={upskillHoursPerWeek}
-                    onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))}
+                    onChange={(e) =>
+                      setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))
+                    }
                   />
+                </div>
+
+                <div className="card">
+                  <label className="lbl">Estimate level</label>
+                  <select
+                    className="inp"
+                    value={estimateLevel}
+                    onChange={(e) =>
+                      setEstimateLevel(e.target.value as "low" | "average" | "high")
+                    }
+                  >
+                    <option value="low">Low (conservative)</option>
+                    <option value="average">Average</option>
+                    <option value="high">High (optimistic)</option>
+                  </select>
                 </div>
               </div>
 
@@ -600,6 +732,7 @@ export default function Page() {
                   <div className="text-right">HOURS SAVED</div>
                   <div className="text-right">ANNUAL VALUE</div>
                 </div>
+
                 {keys
                   .filter((k) => selected.includes(k))
                   .map((k) => {
@@ -613,9 +746,13 @@ export default function Page() {
                       >
                         <div>
                           <div className="font-bold">{PRIORITY_META[k].label}</div>
-                          <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
+                          <div className="text-sm muted">
+                            {PRIORITY_META[k].blurb}
+                          </div>
                         </div>
-                        <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
+                        <div className="text-right font-semibold">
+                          {hours.toLocaleString()} h
+                        </div>
                         <div className="text-right font-semibold">
                           {symbol}
                           {Math.round(value).toLocaleString()}
@@ -623,6 +760,7 @@ export default function Page() {
                       </div>
                     );
                   })}
+
                 <div
                   className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t"
                   style={{ borderColor: "var(--border-strong)", background: "#0f1216" }}
@@ -643,14 +781,16 @@ export default function Page() {
                 <div className="text-sm font-bold mb-2">Next steps</div>
                 <ul className="list-disc pl-5 space-y-1 text-sm muted">
                   <li>
-                    Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.
+                    Map top 3 workflows → ship prompt templates & QA/guardrails
+                    within 2 weeks.
                   </li>
                   <li>
-                    Launch “AI Champions” cohort; set quarterly ROI reviews; track usage to
-                    correlate with retention.
+                    Launch “AI Champions” cohort; set quarterly ROI reviews; track
+                    usage to correlate with retention.
                   </li>
                   <li>
-                    Set competency coverage target to 60% and measure weekly AI-in-task usage.
+                    Set competency coverage target to 60% and measure weekly
+                    AI-in-task usage.
                   </li>
                 </ul>
               </div>
