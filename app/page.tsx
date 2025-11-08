@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 /* =========================
    Types & constants
@@ -81,6 +81,47 @@ const maturityExplainer = [
   "Embedded: >80% coverage; evals/guardrails; continuous improvement.",
 ];
 
+/* ===== Presets for the 3-point slider ===== */
+const LEVELS = ["low", "average", "high"] as const;
+type Level = (typeof LEVELS)[number];
+
+const PRESETS: Record<
+  Level,
+  {
+    throughputPct: number;
+    handoffPct: number;
+    retentionLiftPct: number;
+    upskillCoveragePct: number;
+    upskillHoursPerWeek: number;
+    scale: number; // used for non-input areas (Quality/CostAvoidance/Onboarding)
+  }
+> = {
+  low: {
+    throughputPct: 5,
+    handoffPct: 3,
+    retentionLiftPct: 1,
+    upskillCoveragePct: 40,
+    upskillHoursPerWeek: 0.3,
+    scale: 0.6,
+  },
+  average: {
+    throughputPct: 8,
+    handoffPct: 6,
+    retentionLiftPct: 2,
+    upskillCoveragePct: 60,
+    upskillHoursPerWeek: 0.5,
+    scale: 1.0,
+  },
+  high: {
+    throughputPct: 12,
+    handoffPct: 10,
+    retentionLiftPct: 3,
+    upskillCoveragePct: 75,
+    upskillHoursPerWeek: 0.8,
+    scale: 1.4,
+  },
+};
+
 /* =========================
    Component
 ========================= */
@@ -114,24 +155,41 @@ export default function Page() {
     keys.filter((k) => PRIORITY_META[k].defaultOn)
   );
 
-  /* Steps 4–6 — Config (kept simple) */
+  /* Steps 4–6 — Config (user-editable inputs) */
   // Throughput
-  const [throughputPct, setThroughputPct] = useState(8);
-  const [handoffPct, setHandoffPct] = useState(6);
+  const [throughputPct, setThroughputPct] = useState(
+    PRESETS.average.throughputPct
+  );
+  const [handoffPct, setHandoffPct] = useState(PRESETS.average.handoffPct);
 
   // Retention
-  const [retentionLiftPct, setRetentionLiftPct] = useState(2);
+  const [retentionLiftPct, setRetentionLiftPct] = useState(
+    PRESETS.average.retentionLiftPct
+  );
   const [baselineAttritionPct, setBaselineAttritionPct] = useState(12);
 
   // Upskilling
-  const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
-  const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
-
-  // NEW: Global estimate level (applies to all areas)
-  const [estimateLevel, setEstimateLevel] = useState<"low" | "average" | "high">(
-    "average"
+  const [upskillCoveragePct, setUpskillCoveragePct] = useState(
+    PRESETS.average.upskillCoveragePct
   );
-  const scale = estimateLevel === "low" ? 0.6 : estimateLevel === "high" ? 1.4 : 1;
+  const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(
+    PRESETS.average.upskillHoursPerWeek
+  );
+
+  /* NEW: Global 3-point slider */
+  const [estimateIndex, setEstimateIndex] = useState(1); // 0=low, 1=average, 2=high
+  const estimateLevel: Level = LEVELS[estimateIndex];
+  const levelPreset = PRESETS[estimateLevel];
+
+  // Apply preset numbers into the visible input boxes whenever the slider moves
+  useEffect(() => {
+    setThroughputPct(levelPreset.throughputPct);
+    setHandoffPct(levelPreset.handoffPct);
+    setRetentionLiftPct(levelPreset.retentionLiftPct);
+    setUpskillCoveragePct(levelPreset.upskillCoveragePct);
+    setUpskillHoursPerWeek(levelPreset.upskillHoursPerWeek);
+    // baseline attrition intentionally not changed
+  }, [estimateIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Calcs */
   const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
@@ -148,48 +206,47 @@ export default function Page() {
     [maturityHoursPerPerson, headcount]
   );
 
-  /* --- Weekly hours by priority (realistic onboarding model + estimate scaling) --- */
+  /* --- Weekly hours by priority (realistic onboarding + global scale for non-input areas) --- */
   const weeklyHours = useMemo(() => {
     // Onboarding: hires/year * weeks_saved_per_hire * 40 / 52
-    // Assumptions: turnover ~10% of HC, 2 weeks saved per new hire (reasonable default).
+    // Assumptions: turnover ~10% of HC, 2 weeks saved per new hire.
     const hiresPerYear = headcount * 0.1;
     const weeksSavedPerHire = 2;
-    const onboardingWeekly =
-      (hiresPerYear * weeksSavedPerHire * 40) / 52; // -> weekly hours
+    const onboardingWeekly = (hiresPerYear * weeksSavedPerHire * 40) / 52;
 
     const v: Record<PriorityKey, number> = {
       throughput: selected.includes("throughput")
         ? Math.round(
-            baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100) * scale
+            baseWeeklyTeamHours *
+              ((throughputPct + handoffPct * 0.5) / 100)
           )
         : 0,
 
+      // Use level scale for areas without explicit inputs
       quality: selected.includes("quality")
-        ? Math.round(baseWeeklyTeamHours * 0.2 * scale)
+        ? Math.round(baseWeeklyTeamHours * 0.2 * levelPreset.scale)
         : 0,
 
       onboarding: selected.includes("onboarding")
-        ? Math.round(onboardingWeekly * scale)
+        ? Math.round(onboardingWeekly * levelPreset.scale)
         : 0,
 
       retention: selected.includes("retention")
         ? Math.round(
-            // avoided attrition -> retained employees * 120 saved hours each / 52
             ((headcount * (baselineAttritionPct / 100)) *
               (retentionLiftPct / 100) *
-              120 *
-              scale) / 52
+              120) / 52
           )
         : 0,
 
       upskilling: selected.includes("upskilling")
         ? Math.round(
-            (upskillCoveragePct / 100) * headcount * upskillHoursPerWeek * scale
+            (upskillCoveragePct / 100) * headcount * upskillHoursPerWeek
           )
         : 0,
 
       costAvoidance: selected.includes("costAvoidance")
-        ? Math.round(baseWeeklyTeamHours * 0.1 * scale)
+        ? Math.round(baseWeeklyTeamHours * 0.1 * levelPreset.scale)
         : 0,
     };
 
@@ -204,7 +261,7 @@ export default function Page() {
     baselineAttritionPct,
     upskillCoveragePct,
     upskillHoursPerWeek,
-    scale,
+    levelPreset.scale,
   ]);
 
   const weeklyTotal = useMemo(
@@ -240,6 +297,14 @@ export default function Page() {
     { id: 6, label: "Upskilling" },
     { id: 7, label: "Results" },
   ];
+
+  // Shared inline style for "dark inputs"
+  const inputStyle: React.CSSProperties = {
+    background: "#111317",
+    color: "#fff",
+    fontWeight: 700,
+    border: "1px solid var(--border)",
+  };
 
   return (
     <div
@@ -288,6 +353,7 @@ export default function Page() {
                     className="inp"
                     value={dept}
                     onChange={(e) => setDept(e.target.value as Dept)}
+                    style={inputStyle}
                   >
                     {[
                       "Company-wide",
@@ -315,6 +381,7 @@ export default function Page() {
                     onChange={(e) =>
                       setHeadcount(parseInt(e.target.value || "0", 10))
                     }
+                    style={inputStyle}
                   />
                 </div>
 
@@ -349,6 +416,7 @@ export default function Page() {
                     onChange={(e) =>
                       setAvgSalary(parseInt(e.target.value || "0", 10))
                     }
+                    style={inputStyle}
                   />
                 </div>
                 <div className="card">
@@ -364,6 +432,7 @@ export default function Page() {
                         parseInt(e.target.value || "0", 10)
                       )
                     }
+                    style={inputStyle}
                   />
                 </div>
                 <div className="card">
@@ -375,6 +444,7 @@ export default function Page() {
                     onChange={(e) =>
                       setProgramMonths(parseInt(e.target.value || "0", 10))
                     }
+                    style={inputStyle}
                   />
                 </div>
               </div>
@@ -510,13 +580,38 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 4: Throughput */}
+          {/* STEP 4: Throughput (+ Global Estimate Slider) */}
           {step === 4 && (
             <div>
               <h2 className="title">Throughput</h2>
               <p className="muted text-sm mb-4">
                 Quick edit of assumptions for throughput impact.
               </p>
+
+              {/* Global 3-point slider */}
+              <div className="card mb-4">
+                <div className="flex items-center justify-between">
+                  <span className="lbl mb-2">Estimate level</span>
+                  <div className="text-xs muted">
+                    {LEVELS[estimateIndex].toUpperCase()}
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={1}
+                  value={estimateIndex}
+                  onChange={(e) => setEstimateIndex(parseInt(e.target.value, 10))}
+                  className="w-full range-slim"
+                />
+                <div className="flex justify-between text-xs font-semibold mt-1" style={{color:"var(--text-dim)"}}>
+                  <span>Low</span><span>Average</span><span>High</span>
+                </div>
+                <div className="mt-2 text-xs muted">
+                  Moving this will update inputs here and on Retention/Upskilling. Areas like Quality/Onboarding also scale.
+                </div>
+              </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
@@ -530,6 +625,7 @@ export default function Page() {
                     onChange={(e) =>
                       setThroughputPct(parseInt(e.target.value || "0", 10))
                     }
+                    style={inputStyle}
                   />
                 </div>
                 <div className="card">
@@ -543,22 +639,8 @@ export default function Page() {
                     onChange={(e) =>
                       setHandoffPct(parseInt(e.target.value || "0", 10))
                     }
+                    style={inputStyle}
                   />
-                </div>
-
-                <div className="card">
-                  <label className="lbl">Estimate level</label>
-                  <select
-                    className="inp"
-                    value={estimateLevel}
-                    onChange={(e) =>
-                      setEstimateLevel(e.target.value as "low" | "average" | "high")
-                    }
-                  >
-                    <option value="low">Low (conservative)</option>
-                    <option value="average">Average</option>
-                    <option value="high">High (optimistic)</option>
-                  </select>
                 </div>
               </div>
 
@@ -589,6 +671,7 @@ export default function Page() {
                     onChange={(e) =>
                       setRetentionLiftPct(parseInt(e.target.value || "0", 10))
                     }
+                    style={inputStyle}
                   />
                 </div>
                 <div className="card">
@@ -602,22 +685,8 @@ export default function Page() {
                     onChange={(e) =>
                       setBaselineAttritionPct(parseInt(e.target.value || "0", 10))
                     }
+                    style={inputStyle}
                   />
-                </div>
-
-                <div className="card">
-                  <label className="lbl">Estimate level</label>
-                  <select
-                    className="inp"
-                    value={estimateLevel}
-                    onChange={(e) =>
-                      setEstimateLevel(e.target.value as "low" | "average" | "high")
-                    }
-                  >
-                    <option value="low">Low (conservative)</option>
-                    <option value="average">Average</option>
-                    <option value="high">High (optimistic)</option>
-                  </select>
                 </div>
               </div>
 
@@ -648,6 +717,7 @@ export default function Page() {
                     onChange={(e) =>
                       setUpskillCoveragePct(parseInt(e.target.value || "0", 10))
                     }
+                    style={inputStyle}
                   />
                 </div>
                 <div className="card">
@@ -661,22 +731,8 @@ export default function Page() {
                     onChange={(e) =>
                       setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))
                     }
+                    style={inputStyle}
                   />
-                </div>
-
-                <div className="card">
-                  <label className="lbl">Estimate level</label>
-                  <select
-                    className="inp"
-                    value={estimateLevel}
-                    onChange={(e) =>
-                      setEstimateLevel(e.target.value as "low" | "average" | "high")
-                    }
-                  >
-                    <option value="low">Low (conservative)</option>
-                    <option value="average">Average</option>
-                    <option value="high">High (optimistic)</option>
-                  </select>
                 </div>
               </div>
 
