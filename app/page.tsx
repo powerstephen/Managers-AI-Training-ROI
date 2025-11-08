@@ -2,9 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-/** -----------------------------
- *  Types & constants
- *  ----------------------------- */
+/** ───────────────── Types & constants ───────────────── **/
 type Currency = "EUR" | "USD" | "GBP" | "AUD";
 const SYMBOL: Record<Currency, string> = { EUR: "€", USD: "$", GBP: "£", AUD: "A$" };
 
@@ -34,6 +32,8 @@ const ALL_KEYS: PriorityKey[] = [
   "costAvoidance",
 ];
 
+const CONFIG_ORDER: PriorityKey[] = ["throughput", "retention", "upskilling"];
+
 const META: Record<PriorityKey, { label: string; blurb: string }> = {
   throughput: { label: "Throughput", blurb: "Ship faster; reduce cycle time and waiting time." },
   quality: { label: "Quality", blurb: "Fewer reworks; better first-pass yield." },
@@ -62,6 +62,9 @@ const MATURITY_EXPLAIN = [
   "Embedded: >80% coverage; evals/guardrails; continuous improvement.",
 ];
 
+const AZURE = "#04e1f9";
+
+/** ───────────────── Page ───────────────── **/
 export default function Page() {
   /** nav */
   const [step, setStep] = useState(1);
@@ -82,7 +85,7 @@ export default function Page() {
   /** Step 3: must choose exactly 3 */
   const [selected, setSelected] = useState<PriorityKey[]>(["throughput", "quality", "onboarding"]);
 
-  /** Step 4–6 inputs */
+  /** Step 4–6 inputs & estimate presets */
   const [estimateLevel, setEstimateLevel] = useState<"low" | "avg" | "high">("avg");
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
@@ -115,7 +118,7 @@ export default function Page() {
         ? Math.round(baseWeeklyTeamHours * 0.12)
         : 0,
       onboarding: selected.includes("onboarding")
-        ? Math.round(((6 * 40) * (headcount * 0.1)) / 52)
+        ? Math.round(((6 * 40) * (headcount * 0.1)) / 52) // toned down onboarding
         : 0,
       retention: selected.includes("retention")
         ? Math.round(((headcount * (baselineAttritionPct / 100)) * (retentionLiftPct / 100) * 80) / 52)
@@ -148,18 +151,46 @@ export default function Page() {
   const paybackMonths = monthlyValue === 0 ? Infinity : programCost / monthlyValue;
   const symbol = SYMBOL[currency];
 
-  /** step helpers */
+  /** config step flow (fix for jumping straight to results) */
+  const selectedConfigOrder = useMemo(
+    () => CONFIG_ORDER.filter((k) => selected.includes(k)),
+    [selected]
+  );
+
+  const firstConfigStep = useMemo(() => {
+    if (selectedConfigOrder[0] === "throughput") return 4;
+    if (selectedConfigOrder[0] === "retention") return 5;
+    if (selectedConfigOrder[0] === "upskilling") return 6;
+    return 7;
+  }, [selectedConfigOrder]);
+
   const goFromPriorities = () => {
-    if (selected.length !== 3) return;
-    if (selected.includes("throughput")) setStep(4);
-    else if (selected.includes("retention")) setStep(5);
-    else if (selected.includes("upskilling")) setStep(6);
-    else setStep(7);
+    if (selected.length !== 3) return; // must pick three
+    setStep(firstConfigStep);
   };
+
   const goNextConfig = (current: number) => {
-    if (current === 4 && selected.includes("retention")) return setStep(5);
-    if (current <= 5 && selected.includes("upskilling")) return setStep(6);
-    setStep(7);
+    const currentKey: PriorityKey | null =
+      current === 4 ? "throughput" : current === 5 ? "retention" : current === 6 ? "upskilling" : null;
+
+    if (!currentKey) {
+      setStep(7);
+      return;
+    }
+
+    // find the next chosen config key in order
+    const idx = selectedConfigOrder.indexOf(currentKey);
+    const nextKey = selectedConfigOrder[idx + 1];
+
+    if (!nextKey) {
+      setStep(7);
+      return;
+    }
+
+    if (nextKey === "throughput") setStep(4);
+    else if (nextKey === "retention") setStep(5);
+    else if (nextKey === "upskilling") setStep(6);
+    else setStep(7);
   };
 
   /** UI bits */
@@ -173,10 +204,8 @@ export default function Page() {
     { id: 7, label: "Results" },
   ];
 
-  const azure = "#04e1f9";
-
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-[#000000] text-white">
       {/* hero */}
       <div className="max-w-6xl mx-auto px-4 pt-6">
         <img
@@ -187,14 +216,14 @@ export default function Page() {
         />
       </div>
 
-      {/* progress */}
+      {/* progress (azure) */}
       <div className="max-w-6xl mx-auto px-4 mt-4">
-        <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+        <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: "#13161a" }}>
           <div
             className="h-1 rounded-full"
             style={{
               width: `${((step - 1) / (steps.length - 1)) * 100}%`,
-              background: azure,
+              background: AZURE,
               transition: "width 200ms",
             }}
           />
@@ -205,7 +234,7 @@ export default function Page() {
               <div
                 className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold"
                 style={{
-                  background: step >= s.id ? azure : "#1f2937",
+                  background: step >= s.id ? AZURE : "#1b1f24",
                   color: step >= s.id ? "black" : "#94a3b8",
                 }}
               >
@@ -219,9 +248,12 @@ export default function Page() {
         </div>
       </div>
 
-      {/* main panel */}
+      {/* main panel (no brown — neutral deep greys) */}
       <div className="max-w-6xl mx-auto px-4 mt-4 pb-16">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 md:p-6">
+        <div
+          className="rounded-2xl p-5 md:p-6"
+          style={{ background: "#0b0e11", border: "1px solid #1f2937" }}
+        >
           {/* Step 1 */}
           {step === 1 && (
             <div>
@@ -229,10 +261,11 @@ export default function Page() {
               <p className="text-zinc-400 text-sm mb-4">Program cost assumptions included below.</p>
 
               <div className="grid md:grid-cols-3 gap-4">
-                <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                   <label className="block text-sm text-zinc-400 mb-1">Department</label>
                   <select
-                    className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2"
+                    className="w-full rounded-lg px-3 py-2 font-semibold"
+                    style={{ background: "#111418", border: "1px solid #2a3441" }}
                     value={dept}
                     onChange={(e) => setDept(e.target.value as Dept)}
                   >
@@ -252,27 +285,28 @@ export default function Page() {
                   </select>
                 </div>
 
-                <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                   <label className="block text-sm text-zinc-400 mb-1">Employees in scope</label>
                   <input
                     type="number"
-                    className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                    className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                    style={{ background: "#111418", border: "1px solid #2a3441" }}
                     value={headcount}
                     onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
 
-                <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                   <label className="block text-sm text-zinc-400 mb-2">Currency</label>
                   <div className="flex flex-wrap gap-2">
                     {(["EUR", "USD", "GBP", "AUD"] as Currency[]).map((c) => (
                       <button
                         key={c}
                         onClick={() => setCurrency(c)}
-                        className="px-3 py-1.5 rounded-full border text-sm"
+                        className="px-3 py-1.5 rounded-full text-sm"
                         style={{
-                          borderColor: currency === c ? azure : "#374151",
-                          background: currency === c ? "#14181d" : "#0b0e11",
+                          border: `1px solid ${currency === c ? AZURE : "#2a3441"}`,
+                          background: currency === c ? "#0f1419" : "#0a0e12",
                           color: "white",
                         }}
                       >
@@ -285,33 +319,36 @@ export default function Page() {
 
               <h3 className="text-lg font-bold mt-8 mb-2">Program cost assumptions</h3>
               <div className="grid md:grid-cols-3 gap-4">
-                <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                   <label className="block text-sm text-zinc-400 mb-1">
                     Average annual salary ({SYMBOL[currency]})
                   </label>
                   <input
                     type="number"
-                    className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                    className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                    style={{ background: "#111418", border: "1px solid #2a3441" }}
                     value={avgSalary}
                     onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
-                <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                   <label className="block text-sm text-zinc-400 mb-1">
                     Training per employee ({SYMBOL[currency]})
                   </label>
                   <input
                     type="number"
-                    className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                    className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                    style={{ background: "#111418", border: "1px solid #2a3441" }}
                     value={trainingPerEmployee}
                     onChange={(e) => setTrainingPerEmployee(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
-                <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                   <label className="block text-sm text-zinc-400 mb-1">Program duration (months)</label>
                   <input
                     type="number"
-                    className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                    className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                    style={{ background: "#111418", border: "1px solid #2a3441" }}
                     value={3}
                     readOnly
                   />
@@ -321,14 +358,15 @@ export default function Page() {
 
               <div className="mt-6 flex justify-end gap-3">
                 <button
-                  className="px-4 py-2 rounded-lg border border-zinc-700 text-zinc-200"
+                  className="px-4 py-2 rounded-lg"
+                  style={{ border: "1px solid #2a3441", color: "#d1d5db" }}
                   onClick={back}
                 >
                   ← Back
                 </button>
                 <button
                   className="px-4 py-2 rounded-lg font-semibold"
-                  style={{ background: azure, color: "black" }}
+                  style={{ background: AZURE, color: "black" }}
                   onClick={next}
                 >
                   Continue →
@@ -346,7 +384,7 @@ export default function Page() {
               </p>
 
               <div className="grid md:grid-cols-[1fr_360px] gap-6">
-                <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                   <label className="block text-sm text-zinc-400 mb-2">Where are you today? (1–10)</label>
                   <input
                     type="range"
@@ -355,6 +393,7 @@ export default function Page() {
                     value={maturity}
                     onChange={(e) => setMaturity(parseInt(e.target.value, 10))}
                     className="w-full"
+                    style={{ accentColor: AZURE }}
                   />
                   <div className="flex justify-between mt-2 text-[13px] text-zinc-400 font-semibold">
                     {Array.from({ length: 10 }).map((_, i) => (
@@ -367,14 +406,14 @@ export default function Page() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                   <div className="text-sm font-semibold text-zinc-300">Estimated hours saved</div>
                   <div className="grid grid-cols-2 gap-4 mt-3">
-                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3">
+                    <div className="rounded-lg p-3" style={{ background: "#0e1318", border: "1px solid #1f2937" }}>
                       <div className="text-xs text-zinc-400">Per employee / week</div>
                       <div className="text-3xl font-extrabold">{maturityToHours(maturity).toFixed(1)}</div>
                     </div>
-                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3">
+                    <div className="rounded-lg p-3" style={{ background: "#0e1318", border: "1px solid #1f2937" }}>
                       <div className="text-xs text-zinc-400">Team / week</div>
                       <div className="text-3xl font-extrabold">{maturityHoursTeam.toLocaleString()}</div>
                     </div>
@@ -385,14 +424,15 @@ export default function Page() {
 
               <div className="mt-6 flex justify-end gap-3">
                 <button
-                  className="px-4 py-2 rounded-lg border border-zinc-700 text-zinc-200"
+                  className="px-4 py-2 rounded-lg"
+                  style={{ border: "1px solid #2a3441", color: "#d1d5db" }}
                   onClick={back}
                 >
                   ← Back
                 </button>
                 <button
                   className="px-4 py-2 rounded-lg font-semibold"
-                  style={{ background: azure, color: "black" }}
+                  style={{ background: AZURE, color: "black" }}
                   onClick={next}
                 >
                   Continue →
@@ -418,10 +458,13 @@ export default function Page() {
                         if (active) setSelected(selected.filter((x) => x !== k));
                         else if (!disabled) setSelected([...selected, k]);
                       }}
-                      className={`text-left rounded-xl border p-4 ${
-                        active ? "bg-[#14181d]" : "bg-[#0b0e11]"
-                      } ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                      style={{ borderColor: active ? azure : "#374151" }}
+                      className="text-left rounded-xl p-4"
+                      style={{
+                        background: active ? "#0f1419" : "#0a0e12",
+                        border: `1px solid ${active ? AZURE : "#2a3441"}`,
+                        opacity: disabled ? 0.5 : 1,
+                        cursor: disabled ? "not-allowed" : "pointer",
+                      }}
                     >
                       <div className="font-semibold">{META[k].label}</div>
                       <div className="text-xs text-zinc-400 mt-1">{META[k].blurb}</div>
@@ -432,16 +475,19 @@ export default function Page() {
 
               <div className="mt-6 flex justify-end gap-3">
                 <button
-                  className="px-4 py-2 rounded-lg border border-zinc-700 text-zinc-200"
+                  className="px-4 py-2 rounded-lg"
+                  style={{ border: "1px solid #2a3441", color: "#d1d5db" }}
                   onClick={back}
                 >
                   ← Back
                 </button>
                 <button
-                  className={`px-4 py-2 rounded-lg font-semibold ${
-                    selected.length !== 3 ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                  style={{ background: azure, color: "black" }}
+                  className="px-4 py-2 rounded-lg font-semibold"
+                  style={{
+                    background: selected.length === 3 ? AZURE : "#0d0f12",
+                    color: selected.length === 3 ? "black" : "#777",
+                    border: "1px solid #2a3441",
+                  }}
                   onClick={goFromPriorities}
                   disabled={selected.length !== 3}
                 >
@@ -461,16 +507,16 @@ export default function Page() {
                   {step === 6 && "Upskilling"}
                 </h2>
 
-                {/* Estimate boxes */}
+                {/* Estimate boxes (Low / Average / High) */}
                 <div className="flex gap-3">
                   {(["low", "avg", "high"] as const).map((lvl) => (
                     <button
                       key={lvl}
                       onClick={() => handleEstimateChange(lvl)}
-                      className="px-3 py-1.5 rounded-lg border text-sm font-semibold"
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold"
                       style={{
-                        borderColor: estimateLevel === lvl ? azure : "#374151",
-                        background: estimateLevel === lvl ? "#14181d" : "#0b0e11",
+                        border: `1px solid ${estimateLevel === lvl ? AZURE : "#2a3441"}`,
+                        background: estimateLevel === lvl ? "#0f1419" : "#0a0e12",
                       }}
                     >
                       {lvl === "low" && (
@@ -493,20 +539,22 @@ export default function Page() {
 
               {step === 4 && (
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                  <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                     <label className="block text-sm text-zinc-400 mb-1">Time reclaimed %</label>
                     <input
                       type="number"
-                      className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                      className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                      style={{ background: "#111418", border: "1px solid #2a3441" }}
                       value={throughputPct}
                       onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))}
                     />
                   </div>
-                  <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                  <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                     <label className="block text-sm text-zinc-400 mb-1">Handoffs reduced %</label>
                     <input
                       type="number"
-                      className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                      className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                      style={{ background: "#111418", border: "1px solid #2a3441" }}
                       value={handoffPct}
                       onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))}
                     />
@@ -516,20 +564,22 @@ export default function Page() {
 
               {step === 5 && (
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                  <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                     <label className="block text-sm text-zinc-400 mb-1">Attrition avoided %</label>
                     <input
                       type="number"
-                      className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                      className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                      style={{ background: "#111418", border: "1px solid #2a3441" }}
                       value={retentionLiftPct}
                       onChange={(e) => setRetentionLiftPct(parseInt(e.target.value || "0", 10))}
                     />
                   </div>
-                  <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                  <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                     <label className="block text-sm text-zinc-400 mb-1">Baseline attrition %</label>
                     <input
                       type="number"
-                      className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                      className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                      style={{ background: "#111418", border: "1px solid #2a3441" }}
                       value={baselineAttritionPct}
                       onChange={(e) => setBaselineAttritionPct(parseInt(e.target.value || "0", 10))}
                     />
@@ -539,21 +589,23 @@ export default function Page() {
 
               {step === 6 && (
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                  <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                     <label className="block text-sm text-zinc-400 mb-1">Coverage target %</label>
                     <input
                       type="number"
-                      className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                      className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                      style={{ background: "#111418", border: "1px solid #2a3441" }}
                       value={upskillCoveragePct}
                       onChange={(e) => setUpskillCoveragePct(parseInt(e.target.value || "0", 10))}
                     />
                   </div>
-                  <div className="rounded-xl border border-zinc-800 bg-black p-4">
+                  <div className="rounded-xl p-4" style={{ background: "#07090c", border: "1px solid #1f2937" }}>
                     <label className="block text-sm text-zinc-400 mb-1">Hours / week per person</label>
                     <input
                       type="number"
                       step="0.1"
-                      className="w-full rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 font-bold"
+                      className="w-full rounded-lg px-3 py-2 font-bold text-white"
+                      style={{ background: "#111418", border: "1px solid #2a3441" }}
                       value={upskillHoursPerWeek}
                       onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))}
                     />
@@ -563,14 +615,15 @@ export default function Page() {
 
               <div className="mt-6 flex justify-end gap-3">
                 <button
-                  className="px-4 py-2 rounded-lg border border-zinc-700 text-zinc-200"
+                  className="px-4 py-2 rounded-lg"
+                  style={{ border: "1px solid #2a3441", color: "#d1d5db" }}
                   onClick={back}
                 >
                   ← Back
                 </button>
                 <button
                   className="px-4 py-2 rounded-lg font-semibold"
-                  style={{ background: azure, color: "black" }}
+                  style={{ background: AZURE, color: "black" }}
                   onClick={() => goNextConfig(step)}
                 >
                   Continue →
@@ -584,7 +637,7 @@ export default function Page() {
             <div>
               <h2 className="text-2xl font-bold mb-4">Results</h2>
 
-              {/* KPIs */}
+              {/* KPIs with subtle azure accents */}
               <div className="grid md:grid-cols-4 gap-4">
                 {[
                   { label: "Total annual value", value: `${symbol}${Math.round(annualValue).toLocaleString()}` },
@@ -597,8 +650,8 @@ export default function Page() {
                 ].map((k) => (
                   <div
                     key={k.label}
-                    className="rounded-xl border bg-black p-4"
-                    style={{ borderColor: azure }}
+                    className="rounded-xl p-4"
+                    style={{ background: "#07090c", border: `1px solid ${AZURE}` }}
                   >
                     <div className="text-sm text-zinc-400">{k.label}</div>
                     <div className="text-2xl font-extrabold mt-1">{k.value}</div>
@@ -607,8 +660,11 @@ export default function Page() {
               </div>
 
               {/* Breakdown table */}
-              <div className="mt-6 rounded-2xl overflow-hidden border border-zinc-800">
-                <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold bg-zinc-900 text-zinc-400">
+              <div className="mt-6 rounded-2xl overflow-hidden" style={{ border: "1px solid #1f2937" }}>
+                <div
+                  className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold"
+                  style={{ background: "#0f1318", color: "#a3aab3" }}
+                >
                   <div>PRIORITY</div>
                   <div className="text-right">HOURS SAVED</div>
                   <div className="text-right">ANNUAL VALUE</div>
@@ -620,7 +676,8 @@ export default function Page() {
                   return (
                     <div
                       key={k}
-                      className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t border-zinc-800"
+                      className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4"
+                      style={{ borderTop: "1px solid #1f2937" }}
                     >
                       <div>
                         <div className="font-bold">{META[k].label}</div>
@@ -635,7 +692,10 @@ export default function Page() {
                   );
                 })}
 
-                <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t border-zinc-800 bg-zinc-900">
+                <div
+                  className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4"
+                  style={{ borderTop: "1px solid #1f2937", background: "#0f1318" }}
+                >
                   <div className="font-extrabold">Total</div>
                   <div className="text-right font-extrabold">{(weeklyTotal * 52).toLocaleString()} h</div>
                   <div className="text-right font-extrabold">
@@ -646,7 +706,10 @@ export default function Page() {
               </div>
 
               {/* Next steps */}
-              <div className="rounded-xl border border-zinc-800 bg-black p-4 mt-6">
+              <div
+                className="rounded-xl p-4 mt-6"
+                style={{ background: "#07090c", border: "1px solid #1f2937" }}
+              >
                 <div className="text-sm font-bold mb-2">Next steps</div>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-zinc-400">
                   <li>Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.</li>
@@ -657,14 +720,15 @@ export default function Page() {
 
               <div className="mt-6 flex justify-between">
                 <button
-                  className="px-4 py-2 rounded-lg border border-zinc-700 text-zinc-200"
+                  className="px-4 py-2 rounded-lg"
+                  style={{ border: "1px solid #2a3441", color: "#d1d5db" }}
                   onClick={back}
                 >
                   ← Back
                 </button>
                 <button
                   className="px-4 py-2 rounded-lg font-semibold"
-                  style={{ background: azure, color: "black" }}
+                  style={{ background: AZURE, color: "black" }}
                   onClick={reset}
                 >
                   Start over
