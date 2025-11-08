@@ -6,28 +6,19 @@ import { useMemo, useState } from "react";
 type Currency = "EUR" | "USD" | "GBP" | "AUD";
 const CURRENCY_SYMBOL: Record<Currency, string> = { EUR:"€", USD:"$", GBP:"£", AUD:"A$" };
 
-type Dept =
-  | "Company-wide" | "Marketing" | "Sales" | "Customer Support" | "Operations" | "Engineering" | "HR";
+type Dept = "Company-wide" | "Marketing" | "Sales" | "Customer Support" | "Operations" | "Engineering" | "HR";
+type PriorityKey = "throughput" | "quality" | "onboarding" | "retention" | "upskilling" | "costAvoidance";
 
-type PriorityKey =
-  | "throughput" | "quality" | "onboarding" | "retention" | "upskilling" | "costAvoidance";
-
-/** No auto-preselects anymore — you’ll choose the 3 explicitly */
-const PRIORITY_META: Record<PriorityKey, {label:string; blurb:string}> = {
-  throughput:{ label:"Throughput", blurb:"Ship faster; reduce cycle time and waiting time." },
-  quality:{ label:"Quality", blurb:"Fewer reworks; better first-pass yield." },
-  onboarding:{ label:"Onboarding", blurb:"Ramp new hires faster with AI assist." },
+const PRIORITY_META: Record<PriorityKey, {label:string; blurb:string; defaultOn?:boolean}> = {
+  throughput:{ label:"Throughput", blurb:"Ship faster; reduce cycle time and waiting time.", defaultOn:true },
+  quality:{ label:"Quality", blurb:"Fewer reworks; better first-pass yield.", defaultOn:true },
+  onboarding:{ label:"Onboarding", blurb:"Ramp new hires faster with AI assist.", defaultOn:true },
   retention:{ label:"Retention", blurb:"Reduce regretted attrition via better tooling." },
   upskilling:{ label:"Upskilling", blurb:"Grow competency coverage; unlock compounding gains." },
   costAvoidance:{ label:"Cost avoidance", blurb:"Avoid outside spend/overtime via automation." },
 };
 
-/** Slimmer, saner default hours-per-employee from maturity */
-const maturityToHours=(lvl:number)=>{
-  const map=[5,4.5,4,3.5,3,2.6,2.2,1.8,1.4,1];
-  return map[Math.min(10,Math.max(1,lvl))-1];
-};
-
+const maturityToHours=(lvl:number)=>{const map=[5,4.5,4,3.5,3,2.6,2.2,1.8,1.4,1];return map[Math.min(10,Math.max(1,lvl))-1];};
 const maturityExplainer=[
   "Early: ad-hoc experiments; big wins from prompt basics + workflow mapping.",
   "Exploring: a few enthusiasts; scattered wins, limited reuse.",
@@ -60,21 +51,15 @@ export default function Page(){
 
   /* Step 3 */
   const keys:PriorityKey[]=["throughput","quality","onboarding","retention","upskilling","costAvoidance"];
-  const [selected,setSelected]=useState<PriorityKey[]>([]); // <— no defaults
+  const [selected,setSelected]=useState<PriorityKey[]>(keys.filter(k=>PRIORITY_META[k].defaultOn));
 
   /* Step 4–6 config */
   const [throughputPct,setThroughputPct]=useState(8);
   const [handoffPct,setHandoffPct]=useState(6);
-
   const [retentionLiftPct,setRetentionLiftPct]=useState(2);
   const [baselineAttritionPct,setBaselineAttritionPct]=useState(12);
-
   const [upskillCoveragePct,setUpskillCoveragePct]=useState(60);
   const [upskillHoursPerWeek,setUpskillHoursPerWeek]=useState(0.5);
-
-  /* Reasonable onboarding defaults (used only if onboarding is selected) */
-  const onboardingHiringRatePct = 15;  // hires per year as % of headcount
-  const onboardingRampWeeksSaved = 2;  // weeks saved per new hire
 
   /* Calcs */
   const hourlyCost=useMemo(()=>avgSalary/52/40,[avgSalary]);
@@ -82,61 +67,17 @@ export default function Page(){
   const maturityHoursTeam=useMemo(()=>Math.round(maturityHoursPerPerson*headcount),[maturityHoursPerPerson,headcount]);
   const baseWeeklyTeamHours=useMemo(()=>maturityHoursPerPerson*headcount,[maturityHoursPerPerson,headcount]);
 
-  /**
-   * Weekly hours by priority.
-   * NOTE: nothing contributes unless the priority is SELECTED.
-   */
   const weeklyHours=useMemo(()=>{
-    const isOn=(k:PriorityKey)=>selected.includes(k);
-
-    // Throughput — scaled from maturity baseline
-    const vThroughput = isOn("throughput")
-      ? Math.round(baseWeeklyTeamHours*((throughputPct + handoffPct*0.5)/100))
-      : 0;
-
-    // Quality — conservative: 10% of base weekly hours
-    const vQuality = isOn("quality")
-      ? Math.round(baseWeeklyTeamHours*0.10)
-      : 0;
-
-    // Onboarding — FIXED: averaged to weekly (no more 124,800h explosions)
-    // hires/year * weeks_saved * 40 / 52
-    const hiresPerYear = headcount * (onboardingHiringRatePct/100);
-    const vOnboarding = isOn("onboarding")
-      ? Math.round((hiresPerYear * onboardingRampWeeksSaved * 40) / 52)
-      : 0;
-
-    // Retention — hours proxy from avoided churn (120h per avoided exit / yr, averaged weekly)
-    const avoidedExitsPerYear = headcount*(baselineAttritionPct/100)*(retentionLiftPct/100);
-    const vRetention = isOn("retention")
-      ? Math.round((avoidedExitsPerYear*120)/52)
-      : 0;
-
-    // Upskilling — hours/week from competency coverage
-    const vUpskilling = isOn("upskilling")
-      ? Math.round((upskillCoveragePct/100)*headcount*upskillHoursPerWeek)
-      : 0;
-
-    // Cost avoidance — small default slice
-    const vCostAvoidance = isOn("costAvoidance")
-      ? Math.round(baseWeeklyTeamHours*0.05)
-      : 0;
-
-    return {
-      throughput:vThroughput,
-      quality:vQuality,
-      onboarding:vOnboarding,
-      retention:vRetention,
-      upskilling:vUpskilling,
-      costAvoidance:vCostAvoidance
+    const v:Record<PriorityKey,number>={
+      throughput:selected.includes("throughput")?Math.round(baseWeeklyTeamHours*((throughputPct+handoffPct*0.5)/100)):0,
+      quality:selected.includes("quality")?Math.round(baseWeeklyTeamHours*0.2):0,
+      onboarding:selected.includes("onboarding")?Math.round((Math.max(0,Math.min(52,2))*40)*(headcount*0.2)):0,
+      retention:selected.includes("retention")?Math.round(((headcount*(baselineAttritionPct/100))*(retentionLiftPct/100)*120)/52):0,
+      upskilling:selected.includes("upskilling")?Math.round((upskillCoveragePct/100)*headcount*upskillHoursPerWeek):0,
+      costAvoidance:selected.includes("costAvoidance")?Math.round(baseWeeklyTeamHours*0.1):0,
     };
-  },[
-    selected, baseWeeklyTeamHours,
-    throughputPct, handoffPct,
-    headcount, retentionLiftPct, baselineAttritionPct,
-    upskillCoveragePct, upskillHoursPerWeek,
-    onboardingHiringRatePct, onboardingRampWeeksSaved
-  ]);
+    return v;
+  },[selected,baseWeeklyTeamHours,throughputPct,handoffPct,headcount,retentionLiftPct,baselineAttritionPct,upskillCoveragePct,upskillHoursPerWeek]);
 
   const weeklyTotal=useMemo(()=>Object.values(weeklyHours).reduce((a,b)=>a+b,0),[weeklyHours]);
   const monthlyValue=useMemo(()=>weeklyTotal*hourlyCost*4,[weeklyTotal,hourlyCost]);
@@ -150,37 +91,29 @@ export default function Page(){
   const steps=[
     {id:1,label:"Team"},
     {id:2,label:"AI Maturity"},
-    {id:3,label:"Top 3 Priorities"},  // renamed
-    {id:4,label:"Throughput"},        // removed “Configure”
+    {id:3,label:"Pick top 3 priorities"},
+    {id:4,label:"Throughput"},
     {id:5,label:"Retention"},
     {id:6,label:"Upskilling"},
     {id:7,label:"Results"},
   ];
-  const progressPct = ((step-1)/(steps.length-1))*100;
 
   return (
     <div className="min-h-screen" style={{background:"var(--bg-page)",color:"var(--text)"}}>
-      {/* HERO */}
+      {/* HERO — same width as content, no zoom */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
         <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft"/>
       </div>
 
       {/* Progress */}
       <div className="w-full max-w-6xl mx-auto px-4 mt-4">
-        <div className="panel flex flex-col gap-4">
-          <div className="flex gap-4 flex-wrap">
-            {steps.map(s=>(
-              <div key={s.id} className="flex items-center gap-2">
-                <span className={`step-chip ${step>=s.id?"step-chip--on":"step-chip--off"}`}>{s.id}</span>
-                <span className="step-label">{s.label}</span>
-              </div>
-            ))}
-          </div>
-          <div className="progress">
-            <div className="progress-track">
-              <div className="progress-fill" style={{width:`${progressPct}%`}}/>
+        <div className="panel flex gap-4 flex-wrap">
+          {steps.map(s=>(
+            <div key={s.id} className="flex items-center gap-2">
+              <span className={`step-chip ${step>=s.id?"step-chip--on":"step-chip--off"}`}>{s.id}</span>
+              <span className="step-label">{s.label}</span>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -280,26 +213,23 @@ export default function Page(){
             </div>
           )}
 
-          {/* STEP 3: Top 3 Priorities (selection only) */}
+          {/* STEP 3: Priorities (selection only) */}
           {step===3&&(
             <div>
-              <h2 className="title">Top 3 Priorities</h2>
+              <h2 className="title">Pick top 3 priorities</h2>
               <p className="muted text-sm mb-4">Choose up to three areas to focus your ROI model.</p>
               <div className="grid md:grid-cols-3 gap-3">
                 {keys.map(k=>{
                   const active=selected.includes(k);
-                  const disabled=!active && selected.length>=3;
+                  const disabled=!active&&selected.length>=3;
                   return(
                     <div key={k} className={`priority ${active?"priority--active":""} ${disabled?"opacity-40 cursor-not-allowed":""}`}>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold">{PRIORITY_META[k].label}</span>
-                        <button
-                          onClick={()=>{
-                            if(active) setSelected(selected.filter(x=>x!==k));
-                            else if(!disabled) setSelected([...selected,k]);
-                          }}
-                          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${active?"bg-[var(--bg-chip)] text-white":"bg-[#22252c] text-white"}`}
-                        >
+                        <button onClick={()=>{
+                          if(active) setSelected(selected.filter(x=>x!==k));
+                          else if(!disabled) setSelected([...selected,k]);
+                        }} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${active?"bg-[var(--bg-chip)] text-white":"bg-[#22252c] text-white"}`}>
                           {active?"Selected":"Select"}
                         </button>
                       </div>
@@ -400,7 +330,7 @@ export default function Page(){
                   <div>PRIORITY</div><div className="text-right">HOURS SAVED</div><div className="text-right">ANNUAL VALUE</div>
                 </div>
                 {keys.filter(k=>selected.includes(k)).map(k=>{
-                  const hours=Math.round((weeklyHours as any)[k]*52);
+                  const hours=Math.round(weeklyHours[k]*52);
                   const value=hours*hourlyCost;
                   return(
                     <div key={k} className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t" style={{borderColor:"var(--border)"}}>
@@ -420,6 +350,7 @@ export default function Page(){
                 </div>
               </div>
 
+              {/* Summary / Next steps */}
               <div className="card mt-6">
                 <div className="text-sm font-bold mb-2">Next steps</div>
                 <ul className="list-disc pl-5 space-y-1 text-sm muted">
