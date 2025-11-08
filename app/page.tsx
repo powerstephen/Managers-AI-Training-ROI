@@ -63,7 +63,7 @@ const PRIORITY_META: Record<
   },
 };
 
-/* AI Maturity → baseline weekly hours per person */
+/* AI Adoption → baseline weekly hours per person */
 const maturityToHours = (lvl: number) => {
   const map = [5, 4.5, 4, 3.5, 3, 2.6, 2.2, 1.8, 1.4, 1];
   return map[Math.min(10, Math.max(1, lvl)) - 1];
@@ -82,57 +82,7 @@ const maturityExplainer = [
   "Embedded: >80% coverage; evals/guardrails; continuous improvement.",
 ];
 
-/* ───────────────────────────────────────────────────────────
-   Compact 3-point slider (Low / Average / High) — LARGE style
-   ─────────────────────────────────────────────────────────── */
-function EstimateLevelControl({
-  estimateIndex,
-  setEstimateIndex,
-  compactLabel = "Estimate level",
-}: {
-  estimateIndex: number;
-  setEstimateIndex: (v: number) => void;
-  compactLabel?: string;
-}) {
-  return (
-    <div className="est-ctl est-ctl--lg">
-      <div className="flex items-center justify-between mb-2">
-        <span className="lbl">{compactLabel}</span>
-        <span className="est-current">
-          {["LOW", "AVERAGE", "HIGH"][estimateIndex]}
-        </span>
-      </div>
-
-      <div className="est-rail est-rail--lg">
-        <div className="est-line est-line--lg" />
-        {[0, 1, 2].map((i) => (
-          <button
-            key={i}
-            className={`est-dot est-dot--lg ${
-              estimateIndex === i ? "est-dot--on" : ""
-            }`}
-            onClick={() => setEstimateIndex(i)}
-            aria-label={`Set ${["Low", "Average", "High"][i]}`}
-          />
-        ))}
-      </div>
-
-      <div className="est-labels">
-        <span>
-          Low <em>(Conservative)</em>
-        </span>
-        <span>
-          Average <em>(Typical)</em>
-        </span>
-        <span>
-          High <em>(Aggressive)</em>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/* Presets per priority for the 3-point slider */
+/* Presets per priority for the 3-level estimate */
 const PRESETS = {
   throughput: {
     low: { throughputPct: 4, handoffPct: 3 },
@@ -152,6 +102,42 @@ const PRESETS = {
 } as const;
 
 /* ───────────────────────────────────────────────────────────
+   Compact 3-option selector (radio-style)
+   ─────────────────────────────────────────────────────────── */
+function Triad({
+  value,
+  onChange,
+}: {
+  value: 0 | 1 | 2; // 0=Low, 1=Average, 2=High
+  onChange: (v: 0 | 1 | 2) => void;
+}) {
+  const opts: Array<{ k: 0 | 1 | 2; label: string; sub: string }> = [
+    { k: 0, label: "Low", sub: "(Conservative)" },
+    { k: 1, label: "Average", sub: "(Typical)" },
+    { k: 2, label: "High", sub: "(Aggressive)" },
+  ];
+  return (
+    <div className="triad">
+      {opts.map((o) => (
+        <button
+          key={o.k}
+          type="button"
+          className={`triad-option ${value === o.k ? "on" : ""}`}
+          onClick={() => onChange(o.k)}
+          aria-pressed={value === o.k}
+        >
+          <span className={`triad-circle ${value === o.k ? "on" : ""}`} />
+          <span className="triad-text">
+            <span className="triad-label">{o.label}</span>
+            <span className="triad-sub">{o.sub}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────
    Page
    ─────────────────────────────────────────────────────────── */
 export default function Page() {
@@ -168,7 +154,7 @@ export default function Page() {
   const [trainingPerEmployee, setTrainingPerEmployee] = useState(850);
   const [programMonths, setProgramMonths] = useState(3);
 
-  /* Step 2 */
+  /* Step 2 (Adoption) */
   const [maturity, setMaturity] = useState(5);
 
   /* Step 3 */
@@ -184,7 +170,7 @@ export default function Page() {
     keys.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 3)
   );
 
-  /* Step 4–6 config + estimate sliders */
+  /* Step 4–6 config + estimate levels (0=Low,1=Avg,2=High) */
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
   const [retentionLiftPct, setRetentionLiftPct] = useState(2);
@@ -192,34 +178,34 @@ export default function Page() {
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
 
-  const [estIdxThroughput, setEstIdxThroughput] = useState(1);
-  const [estIdxRetention, setEstIdxRetention] = useState(1);
-  const [estIdxUpskilling, setEstIdxUpskilling] = useState(1);
+  const [lvlThroughput, setLvlThroughput] = useState<0 | 1 | 2>(1);
+  const [lvlRetention, setLvlRetention] = useState<0 | 1 | 2>(1);
+  const [lvlUpskilling, setLvlUpskilling] = useState<0 | 1 | 2>(1);
 
-  /* Apply presets when estimate changes */
+  /* Apply presets when levels change */
   useEffect(() => {
     const p = [PRESETS.throughput.low, PRESETS.throughput.avg, PRESETS.throughput.high][
-      estIdxThroughput
+      lvlThroughput
     ];
     setThroughputPct(p.throughputPct);
     setHandoffPct(p.handoffPct);
-  }, [estIdxThroughput]);
+  }, [lvlThroughput]);
 
   useEffect(() => {
     const p = [PRESETS.retention.low, PRESETS.retention.avg, PRESETS.retention.high][
-      estIdxRetention
+      lvlRetention
     ];
     setRetentionLiftPct(p.retentionLiftPct);
     setBaselineAttritionPct(p.baselineAttritionPct);
-  }, [estIdxRetention]);
+  }, [lvlRetention]);
 
   useEffect(() => {
     const p = [PRESETS.upskilling.low, PRESETS.upskilling.avg, PRESETS.upskilling.high][
-      estIdxUpskilling
+      lvlUpskilling
     ];
     setUpskillCoveragePct(p.upskillCoveragePct);
     setUpskillHoursPerWeek(p.upskillHoursPerWeek);
-  }, [estIdxUpskilling]);
+  }, [lvlUpskilling]);
 
   /* Calcs */
   const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
@@ -236,12 +222,10 @@ export default function Page() {
     [maturityHoursPerPerson, headcount]
   );
 
-  /* Make onboarding realistic (previously far too high).
-     Assume 20% of headcount hires yearly; each hire saves ~10 hours during onboarding across 4 weeks
-     (with AI docs, templates, QA). Weeklyized across the year. */
+  /* Make onboarding realistic */
   const onboardingWeeklyHours = useMemo(() => {
-    const hires = headcount * 0.2; // 20% turnover/hiring per year
-    const totalHours = hires * 10 * 4; // 10 hours/week * 4 weeks
+    const hires = headcount * 0.2; // 20% yearly movement/hiring
+    const totalHours = hires * 10 * 4; // 10 h/wk * 4 wks
     return Math.round(totalHours / 52);
   }, [headcount]);
 
@@ -261,7 +245,7 @@ export default function Page() {
             ((headcount * (baselineAttritionPct / 100)) *
               (retentionLiftPct / 100) *
               120) / 52
-          ) // 120h per avoided attrition (handover/backfill/interviews)
+          )
         : 0,
       upskilling: selected.includes("upskilling")
         ? Math.round((upskillCoveragePct / 100) * headcount * upskillHoursPerWeek)
@@ -310,8 +294,8 @@ export default function Page() {
 
   const steps = [
     { id: 1, label: "Team" },
-    { id: 2, label: "AI Maturity" },
-    { id: 3, label: "Top 3 Priorities" },
+    { id: 2, label: "AI Adoption" },          // renamed
+    { id: 3, label: "Team Priorities" },      // renamed
     { id: 4, label: "Throughput" },
     { id: 5, label: "Retention" },
     { id: 6, label: "Upskilling" },
@@ -442,10 +426,14 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 2: AI Maturity */}
+          {/* STEP 2: AI Adoption */}
           {step === 2 && (
             <div>
-              <h2 className="title">AI Maturity</h2>
+              <h2 className="title">AI Adoption</h2>
+              <p className="muted text-sm mb-4">
+                Benchmark where you are today to set realistic expectations for impact and
+                identify the right next moves.
+              </p>
               <div className="grid md:grid-cols-[1fr_360px] gap-6">
                 <div className="card">
                   <label className="lbl mb-2">Where are you today? (1–10)</label>
@@ -502,10 +490,10 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 3: Top 3 Priorities */}
+          {/* STEP 3: Team Priorities */}
           {step === 3 && (
             <div>
-              <h2 className="title">Top 3 Priorities</h2>
+              <h2 className="title">Team Priorities</h2>
               <p className="muted text-sm mb-4">
                 Choose up to three areas to focus your ROI model.
               </p>
@@ -584,11 +572,7 @@ export default function Page() {
               </div>
 
               <div className="mt-4">
-                <EstimateLevelControl
-                  estimateIndex={estIdxThroughput}
-                  setEstimateIndex={setEstIdxThroughput}
-                  compactLabel="Estimate level"
-                />
+                <Triad value={lvlThroughput} onChange={setLvlThroughput} />
               </div>
 
               <div className="mt-6 flex justify-end gap-3">
@@ -636,11 +620,7 @@ export default function Page() {
               </div>
 
               <div className="mt-4">
-                <EstimateLevelControl
-                  estimateIndex={estIdxRetention}
-                  setEstimateIndex={setEstIdxRetention}
-                  compactLabel="Estimate level"
-                />
+                <Triad value={lvlRetention} onChange={setLvlRetention} />
               </div>
 
               <div className="mt-6 flex justify-end gap-3">
@@ -686,11 +666,7 @@ export default function Page() {
               </div>
 
               <div className="mt-4">
-                <EstimateLevelControl
-                  estimateIndex={estIdxUpskilling}
-                  setEstimateIndex={setEstIdxUpskilling}
-                  compactLabel="Estimate level"
-                />
+                <Triad value={lvlUpskilling} onChange={setLvlUpskilling} />
               </div>
 
               <div className="mt-6 flex justify-end gap-3">
