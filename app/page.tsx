@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
-/* =========================
+/* ───────────────────────────────────────────────────────────
    Types & constants
-========================= */
+   ─────────────────────────────────────────────────────────── */
 type Currency = "EUR" | "USD" | "GBP" | "AUD";
 const CURRENCY_SYMBOL: Record<Currency, string> = {
   EUR: "€",
@@ -63,6 +63,7 @@ const PRIORITY_META: Record<
   },
 };
 
+/* AI Maturity → baseline weekly hours per person */
 const maturityToHours = (lvl: number) => {
   const map = [5, 4.5, 4, 3.5, 3, 2.6, 2.2, 1.8, 1.4, 1];
   return map[Math.min(10, Math.max(1, lvl)) - 1];
@@ -81,48 +82,9 @@ const maturityExplainer = [
   "Embedded: >80% coverage; evals/guardrails; continuous improvement.",
 ];
 
-/* ===== Presets for the 3-point slider ===== */
-const LEVELS = ["low", "average", "high"] as const;
-type Level = (typeof LEVELS)[number];
-
-const PRESETS: Record<
-  Level,
-  {
-    throughputPct: number;
-    handoffPct: number;
-    retentionLiftPct: number;
-    upskillCoveragePct: number;
-    upskillHoursPerWeek: number;
-    scale: number; // used for non-input areas (Quality/CostAvoidance/Onboarding)
-  }
-> = {
-  low: {
-    throughputPct: 5,
-    handoffPct: 3,
-    retentionLiftPct: 1,
-    upskillCoveragePct: 40,
-    upskillHoursPerWeek: 0.3,
-    scale: 0.6,
-  },
-  average: {
-    throughputPct: 8,
-    handoffPct: 6,
-    retentionLiftPct: 2,
-    upskillCoveragePct: 60,
-    upskillHoursPerWeek: 0.5,
-    scale: 1.0,
-  },
-  high: {
-    throughputPct: 12,
-    handoffPct: 10,
-    retentionLiftPct: 3,
-    upskillCoveragePct: 75,
-    upskillHoursPerWeek: 0.8,
-    scale: 1.4,
-  },
-};
-
-/* Small, compact slider used in Steps 4–6 */
+/* ───────────────────────────────────────────────────────────
+   Compact 3-point slider (Low / Average / High) — LARGE style
+   ─────────────────────────────────────────────────────────── */
 function EstimateLevelControl({
   estimateIndex,
   setEstimateIndex,
@@ -133,47 +95,72 @@ function EstimateLevelControl({
   compactLabel?: string;
 }) {
   return (
-    <div className="est-ctl">
-      <div className="flex items-center justify-between mb-1">
+    <div className="est-ctl est-ctl--lg">
+      <div className="flex items-center justify-between mb-2">
         <span className="lbl">{compactLabel}</span>
-        <span className="text-[11px] font-semibold" style={{ color: "var(--text-dim)" }}>
+        <span className="est-current">
           {["LOW", "AVERAGE", "HIGH"][estimateIndex]}
         </span>
       </div>
 
-      <div className="est-rail">
-        {/* Thin vivid-azure line */}
-        <div className="est-line" />
-        {/* Three dots */}
+      <div className="est-rail est-rail--lg">
+        <div className="est-line est-line--lg" />
         {[0, 1, 2].map((i) => (
           <button
             key={i}
-            className={`est-dot ${estimateIndex === i ? "est-dot--on" : ""}`}
+            className={`est-dot est-dot--lg ${
+              estimateIndex === i ? "est-dot--on" : ""
+            }`}
             onClick={() => setEstimateIndex(i)}
             aria-label={`Set ${["Low", "Average", "High"][i]}`}
           />
         ))}
       </div>
 
-      <div className="flex justify-between text-[11px] font-semibold mt-1" style={{ color: "var(--text-dim)" }}>
-        <span>Low</span>
-        <span>Average</span>
-        <span>High</span>
+      <div className="est-labels">
+        <span>
+          Low <em>(Conservative)</em>
+        </span>
+        <span>
+          Average <em>(Typical)</em>
+        </span>
+        <span>
+          High <em>(Aggressive)</em>
+        </span>
       </div>
     </div>
   );
 }
 
-/* =========================
-   Component
-========================= */
+/* Presets per priority for the 3-point slider */
+const PRESETS = {
+  throughput: {
+    low: { throughputPct: 4, handoffPct: 3 },
+    avg: { throughputPct: 8, handoffPct: 6 },
+    high: { throughputPct: 12, handoffPct: 10 },
+  },
+  retention: {
+    low: { retentionLiftPct: 1, baselineAttritionPct: 12 },
+    avg: { retentionLiftPct: 2, baselineAttritionPct: 12 },
+    high: { retentionLiftPct: 3, baselineAttritionPct: 15 },
+  },
+  upskilling: {
+    low: { upskillCoveragePct: 40, upskillHoursPerWeek: 0.4 },
+    avg: { upskillCoveragePct: 60, upskillHoursPerWeek: 0.5 },
+    high: { upskillCoveragePct: 80, upskillHoursPerWeek: 0.7 },
+  },
+} as const;
+
+/* ───────────────────────────────────────────────────────────
+   Page
+   ─────────────────────────────────────────────────────────── */
 export default function Page() {
   const [step, setStep] = useState(1);
   const next = () => setStep((s) => Math.min(7, s + 1));
   const back = () => setStep((s) => Math.max(1, s - 1));
   const reset = () => window.location.reload();
 
-  /* Step 1 — Team & Costs */
+  /* Step 1 */
   const [dept, setDept] = useState<Dept>("Company-wide");
   const [headcount, setHeadcount] = useState(150);
   const [currency, setCurrency] = useState<Currency>("EUR");
@@ -181,10 +168,10 @@ export default function Page() {
   const [trainingPerEmployee, setTrainingPerEmployee] = useState(850);
   const [programMonths, setProgramMonths] = useState(3);
 
-  /* Step 2 — AI Maturity */
+  /* Step 2 */
   const [maturity, setMaturity] = useState(5);
 
-  /* Step 3 — Priorities */
+  /* Step 3 */
   const keys: PriorityKey[] = [
     "throughput",
     "quality",
@@ -194,44 +181,45 @@ export default function Page() {
     "costAvoidance",
   ];
   const [selected, setSelected] = useState<PriorityKey[]>(
-    keys.filter((k) => PRIORITY_META[k].defaultOn)
+    keys.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 3)
   );
 
-  /* Steps 4–6 — Config (user-editable inputs) */
-  // Throughput
-  const [throughputPct, setThroughputPct] = useState(
-    PRESETS.average.throughputPct
-  );
-  const [handoffPct, setHandoffPct] = useState(PRESETS.average.handoffPct);
-
-  // Retention
-  const [retentionLiftPct, setRetentionLiftPct] = useState(
-    PRESETS.average.retentionLiftPct
-  );
+  /* Step 4–6 config + estimate sliders */
+  const [throughputPct, setThroughputPct] = useState(8);
+  const [handoffPct, setHandoffPct] = useState(6);
+  const [retentionLiftPct, setRetentionLiftPct] = useState(2);
   const [baselineAttritionPct, setBaselineAttritionPct] = useState(12);
+  const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
+  const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
 
-  // Upskilling
-  const [upskillCoveragePct, setUpskillCoveragePct] = useState(
-    PRESETS.average.upskillCoveragePct
-  );
-  const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(
-    PRESETS.average.upskillHoursPerWeek
-  );
+  const [estIdxThroughput, setEstIdxThroughput] = useState(1);
+  const [estIdxRetention, setEstIdxRetention] = useState(1);
+  const [estIdxUpskilling, setEstIdxUpskilling] = useState(1);
 
-  /* NEW: Global 3-point slider */
-  const [estimateIndex, setEstimateIndex] = useState(1); // 0=low, 1=average, 2=high
-  const estimateLevel: Level = LEVELS[estimateIndex];
-  const levelPreset = PRESETS[estimateLevel];
-
-  // Apply preset numbers into the visible input boxes whenever the slider moves
+  /* Apply presets when estimate changes */
   useEffect(() => {
-    setThroughputPct(levelPreset.throughputPct);
-    setHandoffPct(levelPreset.handoffPct);
-    setRetentionLiftPct(levelPreset.retentionLiftPct);
-    setUpskillCoveragePct(levelPreset.upskillCoveragePct);
-    setUpskillHoursPerWeek(levelPreset.upskillHoursPerWeek);
-    // baseline attrition intentionally not changed
-  }, [estimateIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+    const p = [PRESETS.throughput.low, PRESETS.throughput.avg, PRESETS.throughput.high][
+      estIdxThroughput
+    ];
+    setThroughputPct(p.throughputPct);
+    setHandoffPct(p.handoffPct);
+  }, [estIdxThroughput]);
+
+  useEffect(() => {
+    const p = [PRESETS.retention.low, PRESETS.retention.avg, PRESETS.retention.high][
+      estIdxRetention
+    ];
+    setRetentionLiftPct(p.retentionLiftPct);
+    setBaselineAttritionPct(p.baselineAttritionPct);
+  }, [estIdxRetention]);
+
+  useEffect(() => {
+    const p = [PRESETS.upskilling.low, PRESETS.upskilling.avg, PRESETS.upskilling.high][
+      estIdxUpskilling
+    ];
+    setUpskillCoveragePct(p.upskillCoveragePct);
+    setUpskillHoursPerWeek(p.upskillHoursPerWeek);
+  }, [estIdxUpskilling]);
 
   /* Calcs */
   const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
@@ -248,50 +236,40 @@ export default function Page() {
     [maturityHoursPerPerson, headcount]
   );
 
-  /* --- Weekly hours by priority (realistic onboarding + global scale for non-input areas) --- */
-  const weeklyHours = useMemo(() => {
-    // Onboarding: hires/year * weeks_saved_per_hire * 40 / 52
-    // Assumptions: turnover ~10% of HC, 2 weeks saved per new hire.
-    const hiresPerYear = headcount * 0.1;
-    const weeksSavedPerHire = 2;
-    const onboardingWeekly = (hiresPerYear * weeksSavedPerHire * 40) / 52;
+  /* Make onboarding realistic (previously far too high).
+     Assume 20% of headcount hires yearly; each hire saves ~10 hours during onboarding across 4 weeks
+     (with AI docs, templates, QA). Weeklyized across the year. */
+  const onboardingWeeklyHours = useMemo(() => {
+    const hires = headcount * 0.2; // 20% turnover/hiring per year
+    const totalHours = hires * 10 * 4; // 10 hours/week * 4 weeks
+    return Math.round(totalHours / 52);
+  }, [headcount]);
 
+  const weeklyHours = useMemo(() => {
     const v: Record<PriorityKey, number> = {
       throughput: selected.includes("throughput")
         ? Math.round(
-            baseWeeklyTeamHours *
-              ((throughputPct + handoffPct * 0.5) / 100)
+            baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100)
           )
         : 0,
-
-      // Use level scale for areas without explicit inputs
       quality: selected.includes("quality")
-        ? Math.round(baseWeeklyTeamHours * 0.2 * levelPreset.scale)
+        ? Math.round(baseWeeklyTeamHours * 0.2)
         : 0,
-
-      onboarding: selected.includes("onboarding")
-        ? Math.round(onboardingWeekly * levelPreset.scale)
-        : 0,
-
+      onboarding: selected.includes("onboarding") ? onboardingWeeklyHours : 0,
       retention: selected.includes("retention")
         ? Math.round(
             ((headcount * (baselineAttritionPct / 100)) *
               (retentionLiftPct / 100) *
               120) / 52
-          )
+          ) // 120h per avoided attrition (handover/backfill/interviews)
         : 0,
-
       upskilling: selected.includes("upskilling")
-        ? Math.round(
-            (upskillCoveragePct / 100) * headcount * upskillHoursPerWeek
-          )
+        ? Math.round((upskillCoveragePct / 100) * headcount * upskillHoursPerWeek)
         : 0,
-
       costAvoidance: selected.includes("costAvoidance")
-        ? Math.round(baseWeeklyTeamHours * 0.1 * levelPreset.scale)
+        ? Math.round(baseWeeklyTeamHours * 0.1)
         : 0,
     };
-
     return v;
   }, [
     selected,
@@ -303,7 +281,7 @@ export default function Page() {
     baselineAttritionPct,
     upskillCoveragePct,
     upskillHoursPerWeek,
-    levelPreset.scale,
+    onboardingWeeklyHours,
   ]);
 
   const weeklyTotal = useMemo(
@@ -333,33 +311,18 @@ export default function Page() {
   const steps = [
     { id: 1, label: "Team" },
     { id: 2, label: "AI Maturity" },
-    { id: 3, label: "Pick top 3 priorities" },
+    { id: 3, label: "Top 3 Priorities" },
     { id: 4, label: "Throughput" },
     { id: 5, label: "Retention" },
     { id: 6, label: "Upskilling" },
     { id: 7, label: "Results" },
   ];
 
-  // Shared inline style for "dark inputs"
-  const inputStyle: React.CSSProperties = {
-    background: "#111317",
-    color: "#fff",
-    fontWeight: 700,
-    border: "1px solid var(--border)",
-  };
-
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "var(--bg-page)", color: "var(--text)" }}
-    >
-      {/* HERO — same width as content */}
+    <div className="min-h-screen" style={{ background: "var(--bg-page)", color: "var(--text)" }}>
+      {/* HERO — exact content width */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
-        <img
-          src="/hero.png"
-          alt="AI at Work — Brainster"
-          className="hero-img shadow-soft"
-        />
+        <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft" />
       </div>
 
       {/* Progress */}
@@ -367,11 +330,7 @@ export default function Page() {
         <div className="panel flex gap-4 flex-wrap">
           {steps.map((s) => (
             <div key={s.id} className="flex items-center gap-2">
-              <span
-                className={`step-chip ${
-                  step >= s.id ? "step-chip--on" : "step-chip--off"
-                }`}
-              >
+              <span className={`step-chip ${step >= s.id ? "step-chip--on" : "step-chip--off"}`}>
                 {s.id}
               </span>
               <span className="step-label">{s.label}</span>
@@ -395,7 +354,6 @@ export default function Page() {
                     className="inp"
                     value={dept}
                     onChange={(e) => setDept(e.target.value as Dept)}
-                    style={inputStyle}
                   >
                     {[
                       "Company-wide",
@@ -420,10 +378,7 @@ export default function Page() {
                     className="inp"
                     type="number"
                     value={headcount}
-                    onChange={(e) =>
-                      setHeadcount(parseInt(e.target.value || "0", 10))
-                    }
-                    style={inputStyle}
+                    onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
 
@@ -443,38 +398,26 @@ export default function Page() {
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold mt-8 mb-2">
-                Program cost assumptions
-              </h3>
+              <h3 className="text-lg font-bold mt-8 mb-2">Program cost assumptions</h3>
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="card">
-                  <label className="lbl">
-                    Average annual salary ({symbol})
-                  </label>
+                  <label className="lbl">Average annual salary ({symbol})</label>
                   <input
                     className="inp"
                     type="number"
                     value={avgSalary}
-                    onChange={(e) =>
-                      setAvgSalary(parseInt(e.target.value || "0", 10))
-                    }
-                    style={inputStyle}
+                    onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
                 <div className="card">
-                  <label className="lbl">
-                    Training per employee ({symbol})
-                  </label>
+                  <label className="lbl">Training per employee ({symbol})</label>
                   <input
                     className="inp"
                     type="number"
                     value={trainingPerEmployee}
                     onChange={(e) =>
-                      setTrainingPerEmployee(
-                        parseInt(e.target.value || "0", 10)
-                      )
+                      setTrainingPerEmployee(parseInt(e.target.value || "0", 10))
                     }
-                    style={inputStyle}
                   />
                 </div>
                 <div className="card">
@@ -483,10 +426,7 @@ export default function Page() {
                     className="inp"
                     type="number"
                     value={programMonths}
-                    onChange={(e) =>
-                      setProgramMonths(parseInt(e.target.value || "0", 10))
-                    }
-                    style={inputStyle}
+                    onChange={(e) => setProgramMonths(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
               </div>
@@ -532,9 +472,7 @@ export default function Page() {
                 </div>
 
                 <div className="card">
-                  <div className="text-sm font-semibold muted">
-                    Estimated hours saved
-                  </div>
+                  <div className="text-sm font-semibold muted">Estimated hours saved</div>
                   <div className="grid grid-cols-2 gap-4 mt-3">
                     <div className="card">
                       <div className="text-xs muted">Per employee / week</div>
@@ -549,9 +487,7 @@ export default function Page() {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 text-xs muted">
-                    Refine via priorities and training below.
-                  </div>
+                  <div className="mt-3 text-xs muted">Refine via priorities and training below.</div>
                 </div>
               </div>
 
@@ -566,10 +502,10 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 3: Priorities */}
+          {/* STEP 3: Top 3 Priorities */}
           {step === 3 && (
             <div>
-              <h2 className="title">Pick top 3 priorities</h2>
+              <h2 className="title">Top 3 Priorities</h2>
               <p className="muted text-sm mb-4">
                 Choose up to three areas to focus your ROI model.
               </p>
@@ -580,32 +516,25 @@ export default function Page() {
                   return (
                     <div
                       key={k}
-                      className={`priority ${
-                        active ? "priority--active" : ""
-                      } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                      className={`priority ${active ? "priority--active" : ""} ${
+                        disabled ? "opacity-40 cursor-not-allowed" : ""
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold">
-                          {PRIORITY_META[k].label}
-                        </span>
+                        <span className="font-semibold">{PRIORITY_META[k].label}</span>
                         <button
                           onClick={() => {
-                            if (active)
-                              setSelected(selected.filter((x) => x !== k));
+                            if (active) setSelected(selected.filter((x) => x !== k));
                             else if (!disabled) setSelected([...selected, k]);
                           }}
                           className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                            active
-                              ? "bg-[var(--bg-chip)] text-white"
-                              : "bg-[#22252c] text-white"
+                            active ? "bg-[var(--bg-chip)] text-white" : "bg-[#22252c] text-white"
                           }`}
                         >
                           {active ? "Selected" : "Select"}
                         </button>
                       </div>
-                      <div className="text-sm muted mt-1">
-                        {PRIORITY_META[k].blurb}
-                      </div>
+                      <div className="text-sm muted mt-1">{PRIORITY_META[k].blurb}</div>
                     </div>
                   );
                 })}
@@ -622,55 +551,47 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 4: Throughput (+ Compact Level Slider) */}
+          {/* STEP 4: Throughput */}
           {step === 4 && (
             <div>
               <h2 className="title">Throughput</h2>
               <p className="muted text-sm mb-4">
                 Quick edit of assumptions for throughput impact.
               </p>
-
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
                   <label className="lbl">Time reclaimed %</label>
                   <input
-                    className="inp"
+                    className="inp inp--dark"
                     type="number"
                     min={0}
                     max={30}
                     value={throughputPct}
-                    onChange={(e) =>
-                      setThroughputPct(parseInt(e.target.value || "0", 10))
-                    }
-                    style={inputStyle}
+                    onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
                 <div className="card">
                   <label className="lbl">Handoffs reduced %</label>
                   <input
-                    className="inp"
+                    className="inp inp--dark"
                     type="number"
                     min={0}
                     max={30}
                     value={handoffPct}
-                    onChange={(e) =>
-                      setHandoffPct(parseInt(e.target.value || "0", 10))
-                    }
-                    style={inputStyle}
+                    onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
               </div>
 
-              {/* COMPACT SLIDER */}
               <div className="mt-4">
                 <EstimateLevelControl
-                  estimateIndex={estimateIndex}
-                  setEstimateIndex={setEstimateIndex}
+                  estimateIndex={estIdxThroughput}
+                  setEstimateIndex={setEstIdxThroughput}
                   compactLabel="Estimate level"
                 />
               </div>
 
-              <div className="mt-4 flex justify-end gap-3">
+              <div className="mt-6 flex justify-end gap-3">
                 <button className="btn-ghost" onClick={back}>
                   ← Back
                 </button>
@@ -681,7 +602,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 5: Retention (+ Compact Level Slider) */}
+          {/* STEP 5: Retention */}
           {step === 5 && (
             <div>
               <h2 className="title">Retention</h2>
@@ -689,7 +610,7 @@ export default function Page() {
                 <div className="card">
                   <label className="lbl">Attrition avoided %</label>
                   <input
-                    className="inp"
+                    className="inp inp--dark"
                     type="number"
                     min={0}
                     max={30}
@@ -697,13 +618,12 @@ export default function Page() {
                     onChange={(e) =>
                       setRetentionLiftPct(parseInt(e.target.value || "0", 10))
                     }
-                    style={inputStyle}
                   />
                 </div>
                 <div className="card">
                   <label className="lbl">Baseline attrition %</label>
                   <input
-                    className="inp"
+                    className="inp inp--dark"
                     type="number"
                     min={0}
                     max={40}
@@ -711,21 +631,19 @@ export default function Page() {
                     onChange={(e) =>
                       setBaselineAttritionPct(parseInt(e.target.value || "0", 10))
                     }
-                    style={inputStyle}
                   />
                 </div>
               </div>
 
-              {/* COMPACT SLIDER */}
               <div className="mt-4">
                 <EstimateLevelControl
-                  estimateIndex={estimateIndex}
-                  setEstimateIndex={setEstimateIndex}
+                  estimateIndex={estIdxRetention}
+                  setEstimateIndex={setEstIdxRetention}
                   compactLabel="Estimate level"
                 />
               </div>
 
-              <div className="mt-4 flex justify-end gap-3">
+              <div className="mt-6 flex justify-end gap-3">
                 <button className="btn-ghost" onClick={back}>
                   ← Back
                 </button>
@@ -736,7 +654,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 6: Upskilling (+ Compact Level Slider) */}
+          {/* STEP 6: Upskilling */}
           {step === 6 && (
             <div>
               <h2 className="title">Upskilling</h2>
@@ -744,7 +662,7 @@ export default function Page() {
                 <div className="card">
                   <label className="lbl">Coverage target %</label>
                   <input
-                    className="inp"
+                    className="inp inp--dark"
                     type="number"
                     min={0}
                     max={100}
@@ -752,35 +670,30 @@ export default function Page() {
                     onChange={(e) =>
                       setUpskillCoveragePct(parseInt(e.target.value || "0", 10))
                     }
-                    style={inputStyle}
                   />
                 </div>
                 <div className="card">
                   <label className="lbl">Hours / week per person</label>
                   <input
-                    className="inp"
+                    className="inp inp--dark"
                     type="number"
                     min={0}
                     step={0.1}
                     value={upskillHoursPerWeek}
-                    onChange={(e) =>
-                      setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))
-                    }
-                    style={inputStyle}
+                    onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))}
                   />
                 </div>
               </div>
 
-              {/* COMPACT SLIDER */}
               <div className="mt-4">
                 <EstimateLevelControl
-                  estimateIndex={estimateIndex}
-                  setEstimateIndex={setEstimateIndex}
+                  estimateIndex={estIdxUpskilling}
+                  setEstimateIndex={setEstIdxUpskilling}
                   compactLabel="Estimate level"
                 />
               </div>
 
-              <div className="mt-4 flex justify-end gap-3">
+              <div className="mt-6 flex justify-end gap-3">
                 <button className="btn-ghost" onClick={back}>
                   ← Back
                 </button>
@@ -832,7 +745,6 @@ export default function Page() {
                   <div className="text-right">HOURS SAVED</div>
                   <div className="text-right">ANNUAL VALUE</div>
                 </div>
-
                 {keys
                   .filter((k) => selected.includes(k))
                   .map((k) => {
@@ -846,13 +758,9 @@ export default function Page() {
                       >
                         <div>
                           <div className="font-bold">{PRIORITY_META[k].label}</div>
-                          <div className="text-sm muted">
-                            {PRIORITY_META[k].blurb}
-                          </div>
+                          <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
                         </div>
-                        <div className="text-right font-semibold">
-                          {hours.toLocaleString()} h
-                        </div>
+                        <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
                         <div className="text-right font-semibold">
                           {symbol}
                           {Math.round(value).toLocaleString()}
@@ -860,7 +768,6 @@ export default function Page() {
                       </div>
                     );
                   })}
-
                 <div
                   className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t"
                   style={{ borderColor: "var(--border-strong)", background: "#0f1216" }}
@@ -881,17 +788,13 @@ export default function Page() {
                 <div className="text-sm font-bold mb-2">Next steps</div>
                 <ul className="list-disc pl-5 space-y-1 text-sm muted">
                   <li>
-                    Map top 3 workflows → ship prompt templates & QA/guardrails
-                    within 2 weeks.
+                    Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.
                   </li>
                   <li>
-                    Launch “AI Champions” cohort; set quarterly ROI reviews; track
-                    usage to correlate with retention.
+                    Launch “AI Champions” cohort; set quarterly ROI reviews; track usage to
+                    correlate with retention.
                   </li>
-                  <li>
-                    Set competency coverage target to 60% and measure weekly
-                    AI-in-task usage.
-                  </li>
+                  <li>Set competency coverage target to 60% and measure weekly AI-in-task usage.</li>
                 </ul>
               </div>
 
