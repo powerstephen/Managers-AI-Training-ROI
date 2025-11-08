@@ -2,69 +2,98 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .shadow-soft {
-    box-shadow: 0 8px 36px rgba(0, 0, 0, 0.32);
-  }
+/* ───────────────── Base dark palette ───────────────── */
+:root {
+  --bg-page: #000000;      /* black */
+  --bg-panel: #191919;     /* lighter grey main card */
+  --bg-card: #121417;      /* darker grey inner boxes */
+  --bg-chip: #3366fe;      /* progress chip blue */
+  --bg-chip-muted: #3b4a81;
+  --text: #ffffff;         /* primary text */
+  --text-dim: #b9c0d0;     /* secondary text */
+  --border: #2a2f36;       /* subtle borders */
+  --border-strong: #3a3f47;
+  --focus: #5b7cff;
 }
 
-/* XL range slider for dark */
-input[type="range"].range-xl {
+/* ───────────────── Utilities ───────────────── */
+@layer utilities {
+  .shadow-soft { box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+}
+
+/* ───────────────── Components ───────────────── */
+@layer components {
+  /* containers */
+  .panel     { @apply rounded-2xl p-6 md:p-8 shadow-soft; background: var(--bg-panel); }
+  .card      { @apply rounded-2xl p-4; background: var(--bg-card); border: 1px solid var(--border); }
+  .kpi       { @apply rounded-2xl p-4; background: var(--bg-card); border: 1px solid var(--border); }
+
+  /* text */
+  .title     { @apply text-xl font-extrabold mb-3; color: var(--text); }
+  .lbl       { @apply block text-sm font-semibold mb-1; color: var(--text); }
+  .hint      { @apply text-xs mt-1; color: var(--text-dim); }
+  .muted     { color: var(--text-dim); }
+
+  /* inputs */
+  .inp {
+    @apply w-full rounded-xl px-3 py-2.5 outline-none;
+    background: #0c0e12;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .inp:focus { box-shadow: 0 0 0 3px rgba(91,124,255,0.35); border-color: var(--focus); }
+
+  /* buttons */
+  .btn        { @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-semibold; background: var(--bg-chip); color: white; }
+  .btn:hover  { filter: brightness(1.05); }
+  .btn-ghost  { @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-semibold border; background: transparent; color: var(--text); border-color: var(--border); }
+  .btn-subtle { @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-semibold; background: #22252c; color: var(--text); }
+
+  /* chips */
+  .pill             { @apply rounded-full px-3 py-1.5 text-sm font-semibold border; border-color: var(--border); color: var(--text); background: #0c0e12; }
+  .pill--active     { background: #1a2236; border-color: var(--focus); }
+
+  /* progress */
+  .step-chip        { @apply w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-semibold; }
+  .step-chip--on    { background: var(--bg-chip); }
+  .step-chip--off   { background: var(--bg-chip-muted); }
+  .step-label       { @apply text-sm font-medium; color: var(--text); }
+
+  /* priority */
+  .priority         { @apply text-left rounded-2xl p-4 border; background: var(--bg-card); border-color: var(--border); }
+  .priority--active { border-color: var(--focus); box-shadow: 0 0 0 3px rgba(91,124,255,0.25) inset; }
+  .tag              { @apply text-[11px] font-semibold rounded-full px-2 py-0.5; background: var(--bg-chip); color: white; }
+  .tag--ghost       { background: #22252c; color: var(--text); }
+
+  /* KPI text */
+  .kpi__label { @apply text-xs font-semibold; color: var(--text-dim); }
+  .kpi__value { @apply text-2xl font-extrabold mt-1; color: var(--text); }
+}
+
+/* ───────────────── Range: slim track, clear thumb ───────────────── */
+input[type="range"].range-slim {
   -webkit-appearance: none;
   width: 100%;
-  height: 18px;
-  background: #1f2747;
+  height: 10px;               /* slimmer than before */
+  background: #2a2f36;
   border-radius: 9999px;
   outline: none;
 }
-input[type="range"].range-xl::-webkit-slider-runnable-track {
-  height: 18px;
-  background: #1f2747;
-  border-radius: 9999px;
-}
-input[type="range"].range-xl::-webkit-slider-thumb {
+input[type="range"].range-slim::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 9999px;
-  margin-top: -5px;
-  background: #4b6bff;
-  border: 3px solid #0b1022;
-  box-shadow: 0 2px 10px rgba(75, 107, 255, 0.35);
+  width: 22px; height: 22px; border-radius: 9999px;
+  background: var(--bg-chip);
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(51,102,254,0.4);
   cursor: pointer;
 }
-input[type="range"].range-xl::-moz-range-track {
-  height: 18px;
-  background: #1f2747;
-  border-radius: 9999px;
-}
-input[type="range"].range-xl::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
-  border-radius: 9999px;
-  background: #4b6bff;
-  border: 3px solid #0b1022;
-  box-shadow: 0 2px 10px rgba(75, 107, 255, 0.35);
+input[type="range"].range-slim::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 9999px;
+  background: var(--bg-chip); border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(51,102,254,0.4);
   cursor: pointer;
 }
 
-@layer components {
-  /* Dark UI tokens while keeping same class names */
-  .lbl { @apply block text-sm font-semibold text-white mb-1; }
-  .hint { @apply text-xs text-white/60 mt-1; }
-  .inp { @apply w-full rounded-xl border border-[#243158] bg-[#0f1633] text-white px-3 py-2.5 outline-none focus:ring-2 focus:ring-[#3a51cc]; }
-  .btn { @apply inline-flex items-center justify-center rounded-xl bg-[#4b6bff] text-white px-4 py-2.5 font-semibold shadow-sm hover:opacity-95; }
-  .btn--ghost { @apply inline-flex items-center justify-center rounded-xl bg-transparent text-white px-4 py-2.5 font-semibold border border-[#243158] hover:bg-[#0f1633]; }
-  .btn--subtle { @apply bg-[#0f1633] text-white border border-[#243158]; }
-  .pill { @apply rounded-full border border-[#243158] bg-[#0f1633] text-white px-3 py-1.5 text-sm font-semibold; }
-  .pill--active { @apply border-[#33407a] bg-[#162048]; }
-  .priority { @apply text-left rounded-2xl border border-[#243158] bg-[#0f1633] p-4 hover:border-[#2d3a70]; }
-  .priority--active { @apply border-[#33407a] bg-[#162048]; }
-  .tag { @apply text-[11px] font-semibold rounded-full px-2 py-0.5 bg-[#4b6bff] text-white; }
-  .tag--ghost { @apply bg-[#162048] text-white; }
-
-  .kpi { @apply rounded-2xl border border-[#243158] bg-[#0f1633] p-4; }
-  .kpi__label { @apply text-xs font-semibold text-white/70; }
-  .kpi__value { @apply text-2xl font-extrabold text-white mt-1; }
-}
+/* page bg */
+html, body { background: var(--bg-page); color: var(--text); }
