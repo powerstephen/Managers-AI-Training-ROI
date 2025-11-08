@@ -224,7 +224,8 @@ export default function Page() {
 
   /* Make onboarding realistic */
   const onboardingWeeklyHours = useMemo(() => {
-    const hires = headcount * 0.2; // 20% yearly movement/hiring
+    // Assume ~20% of headcount are new/reassigned over the year, each with ~10 hours/week onboarding support for 4 weeks
+    const hires = headcount * 0.2;
     const totalHours = hires * 10 * 4; // 10 h/wk * 4 wks
     return Math.round(totalHours / 52);
   }, [headcount]);
@@ -282,8 +283,8 @@ export default function Page() {
   );
   const annualValue = useMemo(() => monthlyValue * 12, [monthlyValue]);
   const annualROI = useMemo(
-    () => (programCost === 0 ? 0 : annualValue / programCost),
-    [annualValue, programCost]
+    () => (programMonths === 0 ? 0 : (annualValue) / (programMonths * (programCost / programMonths))),
+    [annualValue, programMonths, programCost]
   );
   const paybackMonths = useMemo(
     () => (monthlyValue === 0 ? Infinity : programCost / monthlyValue),
