@@ -122,6 +122,48 @@ const PRESETS: Record<
   },
 };
 
+/* Small, compact slider used in Steps 4–6 */
+function EstimateLevelControl({
+  estimateIndex,
+  setEstimateIndex,
+  compactLabel = "Estimate level",
+}: {
+  estimateIndex: number;
+  setEstimateIndex: (v: number) => void;
+  compactLabel?: string;
+}) {
+  return (
+    <div className="est-ctl">
+      <div className="flex items-center justify-between mb-1">
+        <span className="lbl">{compactLabel}</span>
+        <span className="text-[11px] font-semibold" style={{ color: "var(--text-dim)" }}>
+          {["LOW", "AVERAGE", "HIGH"][estimateIndex]}
+        </span>
+      </div>
+
+      <div className="est-rail">
+        {/* Thin vivid-azure line */}
+        <div className="est-line" />
+        {/* Three dots */}
+        {[0, 1, 2].map((i) => (
+          <button
+            key={i}
+            className={`est-dot ${estimateIndex === i ? "est-dot--on" : ""}`}
+            onClick={() => setEstimateIndex(i)}
+            aria-label={`Set ${["Low", "Average", "High"][i]}`}
+          />
+        ))}
+      </div>
+
+      <div className="flex justify-between text-[11px] font-semibold mt-1" style={{ color: "var(--text-dim)" }}>
+        <span>Low</span>
+        <span>Average</span>
+        <span>High</span>
+      </div>
+    </div>
+  );
+}
+
 /* =========================
    Component
 ========================= */
@@ -580,38 +622,13 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 4: Throughput (+ Global Estimate Slider) */}
+          {/* STEP 4: Throughput (+ Compact Level Slider) */}
           {step === 4 && (
             <div>
               <h2 className="title">Throughput</h2>
               <p className="muted text-sm mb-4">
                 Quick edit of assumptions for throughput impact.
               </p>
-
-              {/* Global 3-point slider */}
-              <div className="card mb-4">
-                <div className="flex items-center justify-between">
-                  <span className="lbl mb-2">Estimate level</span>
-                  <div className="text-xs muted">
-                    {LEVELS[estimateIndex].toUpperCase()}
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={2}
-                  step={1}
-                  value={estimateIndex}
-                  onChange={(e) => setEstimateIndex(parseInt(e.target.value, 10))}
-                  className="w-full range-slim"
-                />
-                <div className="flex justify-between text-xs font-semibold mt-1" style={{color:"var(--text-dim)"}}>
-                  <span>Low</span><span>Average</span><span>High</span>
-                </div>
-                <div className="mt-2 text-xs muted">
-                  Moving this will update inputs here and on Retention/Upskilling. Areas like Quality/Onboarding also scale.
-                </div>
-              </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
@@ -644,7 +661,16 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end gap-3">
+              {/* COMPACT SLIDER */}
+              <div className="mt-4">
+                <EstimateLevelControl
+                  estimateIndex={estimateIndex}
+                  setEstimateIndex={setEstimateIndex}
+                  compactLabel="Estimate level"
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-3">
                 <button className="btn-ghost" onClick={back}>
                   ← Back
                 </button>
@@ -655,7 +681,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 5: Retention */}
+          {/* STEP 5: Retention (+ Compact Level Slider) */}
           {step === 5 && (
             <div>
               <h2 className="title">Retention</h2>
@@ -690,7 +716,16 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end gap-3">
+              {/* COMPACT SLIDER */}
+              <div className="mt-4">
+                <EstimateLevelControl
+                  estimateIndex={estimateIndex}
+                  setEstimateIndex={setEstimateIndex}
+                  compactLabel="Estimate level"
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-3">
                 <button className="btn-ghost" onClick={back}>
                   ← Back
                 </button>
@@ -701,7 +736,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 6: Upskilling */}
+          {/* STEP 6: Upskilling (+ Compact Level Slider) */}
           {step === 6 && (
             <div>
               <h2 className="title">Upskilling</h2>
@@ -736,7 +771,16 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end gap-3">
+              {/* COMPACT SLIDER */}
+              <div className="mt-4">
+                <EstimateLevelControl
+                  estimateIndex={estimateIndex}
+                  setEstimateIndex={setEstimateIndex}
+                  compactLabel="Estimate level"
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-3">
                 <button className="btn-ghost" onClick={back}>
                   ← Back
                 </button>
