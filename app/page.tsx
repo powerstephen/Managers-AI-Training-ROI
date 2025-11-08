@@ -89,7 +89,7 @@ export default function Page(){
   const symbol=CURRENCY_SYMBOL[currency];
 
   const steps=[
-    {id:1,label:"Team"},            // renamed
+    {id:1,label:"Team"},
     {id:2,label:"AI Maturity"},
     {id:3,label:"Pick top 3 priorities"},
     {id:4,label:"Throughput"},
@@ -100,14 +100,9 @@ export default function Page(){
 
   return (
     <div className="min-h-screen" style={{background:"var(--bg-page)",color:"var(--text)"}}>
-      {/* HERO — same width as content: wrap all in the SAME max-w container */}
+      {/* HERO — same width as content, no zoom */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
-        <img
-          src="/hero.png"
-          alt="AI at Work — Brainster"
-          className="w-full h-auto max-h-[165px] object-cover rounded-2xl shadow-soft"
-          style={{ objectPosition:"center" }}
-        />
+        <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft"/>
       </div>
 
       {/* Progress */}
@@ -131,7 +126,7 @@ export default function Page(){
               <h2 className="title">Team</h2>
 
               <div className="grid md:grid-cols-3 gap-4">
-                <div>
+                <div className="card">
                   <label className="lbl">Department</label>
                   <select className="inp" value={dept} onChange={e=>setDept(e.target.value as Dept)}>
                     {["Company-wide","Marketing","Sales","Customer Support","Operations","Engineering","HR"].map(d=>(
@@ -141,12 +136,12 @@ export default function Page(){
                   <p className="hint">Choose a function or “Company-wide”.</p>
                 </div>
 
-                <div>
+                <div className="card">
                   <label className="lbl">Employees in scope</label>
                   <input className="inp" type="number" value={headcount} onChange={e=>setHeadcount(parseInt(e.target.value||"0",10))}/>
                 </div>
 
-                <div>
+                <div className="card">
                   <label className="lbl">Currency</label>
                   <div className="flex gap-2 flex-wrap">
                     {(["EUR","USD","GBP","AUD"] as Currency[]).map(c=>(
@@ -156,17 +151,17 @@ export default function Page(){
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold mt-8 mb-2" style={{color:"var(--text)"}}>Program cost assumptions</h3>
+              <h3 className="text-lg font-bold mt-8 mb-2">Program cost assumptions</h3>
               <div className="grid md:grid-cols-3 gap-4">
-                <div>
+                <div className="card">
                   <label className="lbl">Average annual salary ({symbol})</label>
                   <input className="inp" type="number" value={avgSalary} onChange={e=>setAvgSalary(parseInt(e.target.value||"0",10))}/>
                 </div>
-                <div>
+                <div className="card">
                   <label className="lbl">Training per employee ({symbol})</label>
                   <input className="inp" type="number" value={trainingPerEmployee} onChange={e=>setTrainingPerEmployee(parseInt(e.target.value||"0",10))}/>
                 </div>
-                <div>
+                <div className="card">
                   <label className="lbl">Program duration (months)</label>
                   <input className="inp" type="number" value={programMonths} onChange={e=>setProgramMonths(parseInt(e.target.value||"0",10))}/>
                 </div>
@@ -234,7 +229,7 @@ export default function Page(){
                         <button onClick={()=>{
                           if(active) setSelected(selected.filter(x=>x!==k));
                           else if(!disabled) setSelected([...selected,k]);
-                        }} className={`tag ${active?"":"tag--ghost"}`}>
+                        }} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${active?"bg-[var(--bg-chip)] text-white":"bg-[#22252c] text-white"}`}>
                           {active?"Selected":"Select"}
                         </button>
                       </div>
@@ -257,11 +252,11 @@ export default function Page(){
               <h2 className="title">Throughput</h2>
               <p className="muted text-sm mb-4">Quick edit of assumptions for throughput impact.</p>
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
+                <div className="card">
                   <label className="lbl">Time reclaimed %</label>
                   <input className="inp" type="number" min={0} max={30} value={throughputPct} onChange={e=>setThroughputPct(parseInt(e.target.value||"0",10))}/>
                 </div>
-                <div>
+                <div className="card">
                   <label className="lbl">Handoffs reduced %</label>
                   <input className="inp" type="number" min={0} max={30} value={handoffPct} onChange={e=>setHandoffPct(parseInt(e.target.value||"0",10))}/>
                 </div>
@@ -279,11 +274,11 @@ export default function Page(){
             <div>
               <h2 className="title">Retention</h2>
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
+                <div className="card">
                   <label className="lbl">Attrition avoided %</label>
                   <input className="inp" type="number" min={0} max={30} value={retentionLiftPct} onChange={e=>setRetentionLiftPct(parseInt(e.target.value||"0",10))}/>
                 </div>
-                <div>
+                <div className="card">
                   <label className="lbl">Baseline attrition %</label>
                   <input className="inp" type="number" min={0} max={40} value={baselineAttritionPct} onChange={e=>setBaselineAttritionPct(parseInt(e.target.value||"0",10))}/>
                 </div>
@@ -301,11 +296,11 @@ export default function Page(){
             <div>
               <h2 className="title">Upskilling</h2>
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
+                <div className="card">
                   <label className="lbl">Coverage target %</label>
                   <input className="inp" type="number" min={0} max={100} value={upskillCoveragePct} onChange={e=>setUpskillCoveragePct(parseInt(e.target.value||"0",10))}/>
                 </div>
-                <div>
+                <div className="card">
                   <label className="lbl">Hours / week per person</label>
                   <input className="inp" type="number" min={0} step={0.1} value={upskillHoursPerWeek} onChange={e=>setUpskillHoursPerWeek(parseFloat(e.target.value||"0"))}/>
                 </div>
@@ -355,9 +350,19 @@ export default function Page(){
                 </div>
               </div>
 
+              {/* Summary / Next steps */}
+              <div className="card mt-6">
+                <div className="text-sm font-bold mb-2">Next steps</div>
+                <ul className="list-disc pl-5 space-y-1 text-sm muted">
+                  <li>Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.</li>
+                  <li>Launch “AI Champions” cohort; set quarterly ROI reviews; track usage to correlate with retention.</li>
+                  <li>Set competency coverage target to 60% and measure weekly AI-in-task usage.</li>
+                </ul>
+              </div>
+
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
-                <button className="btn-subtle" onClick={reset}>Start over</button>
+                <button className="btn" onClick={reset}>Start over</button>
               </div>
             </div>
           )}
