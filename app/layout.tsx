@@ -1,16 +1,18 @@
+// app/layout.tsx
 import "./globals.css";
-import type { ReactNode } from "react";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "AI at Work — Human Productivity ROI",
-  description:
-    "Quantify time saved, payback, and retention impact from training managers and teams to work effectively with AI.",
+export const metadata: Metadata = {
+  title: "AI at Work — ROI",
+  description: "Human productivity ROI model for AI training",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="min-h-screen bg-black text-white antialiased">
+        <main className="min-h-screen">{children}</main>
+      </body>
     </html>
   );
 }
