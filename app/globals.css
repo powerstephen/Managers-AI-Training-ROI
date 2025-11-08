@@ -2,7 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Keep this file minimal to avoid conflicts that can hide content */
+/* Keep global CSS minimal and neutral (no brownish tints) */
 html, body {
   height: 100%;
+  background: #000; /* page background */
+  color: #fff;
 }
+
+/* Optional: smooth fonts */
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
