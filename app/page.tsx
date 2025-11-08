@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 /** -----------------------------
- *  Types & constants (kept minimal)
+ *  Types & constants
  *  ----------------------------- */
 type Currency = "EUR" | "USD" | "GBP" | "AUD";
 const SYMBOL: Record<Currency, string> = { EUR: "€", USD: "$", GBP: "£", AUD: "A$" };
@@ -79,10 +79,10 @@ export default function Page() {
   /** Step 2: AI Adoption */
   const [maturity, setMaturity] = useState(5);
 
-  /** Step 3: Priorities (must choose exactly 3) */
+  /** Step 3: must choose exactly 3 */
   const [selected, setSelected] = useState<PriorityKey[]>(["throughput", "quality", "onboarding"]);
 
-  /** Steps 4–6 inputs */
+  /** Step 4–6 inputs */
   const [estimateLevel, setEstimateLevel] = useState<"low" | "avg" | "high">("avg");
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
@@ -96,7 +96,7 @@ export default function Page() {
     const mult = lvl === "low" ? 0.7 : lvl === "high" ? 1.3 : 1;
     setThroughputPct(Math.round(8 * mult));
     setHandoffPct(Math.round(6 * mult));
-    setRetentionLiftPct(Math.max(1, Math.round(2 * mult))); // keep it sensible
+    setRetentionLiftPct(Math.max(1, Math.round(2 * mult)));
     setUpskillHoursPerWeek(parseFloat((0.5 * mult).toFixed(1)));
   };
 
@@ -112,20 +112,19 @@ export default function Page() {
         ? Math.round(baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100))
         : 0,
       quality: selected.includes("quality")
-        ? Math.round(baseWeeklyTeamHours * 0.12) // more conservative than before
+        ? Math.round(baseWeeklyTeamHours * 0.12)
         : 0,
       onboarding: selected.includes("onboarding")
-        ? // conservative: 6 weeks ramp saved per new hire in 10% of team / spread over a year
-          Math.round(((6 * 40) * (headcount * 0.1)) / 52)
+        ? Math.round(((6 * 40) * (headcount * 0.1)) / 52)
         : 0,
       retention: selected.includes("retention")
-        ? Math.round(((headcount * (baselineAttritionPct / 100)) * (retentionLiftPct / 100) * 80) / 52) // 80h value per avoided attrition/yr
+        ? Math.round(((headcount * (baselineAttritionPct / 100)) * (retentionLiftPct / 100) * 80) / 52)
         : 0,
       upskilling: selected.includes("upskilling")
         ? Math.round((upskillCoveragePct / 100) * headcount * upskillHoursPerWeek)
         : 0,
       costAvoidance: selected.includes("costAvoidance")
-        ? Math.round(baseWeeklyTeamHours * 0.05) // smaller default
+        ? Math.round(baseWeeklyTeamHours * 0.05)
         : 0,
     };
     return v;
@@ -194,7 +193,7 @@ export default function Page() {
           <div
             className="h-1 rounded-full"
             style={{
-              width: `${(step - 1) / (steps.length - 1) * 100}%`,
+              width: `${((step - 1) / (steps.length - 1)) * 100}%`,
               background: azure,
               transition: "width 200ms",
             }}
@@ -380,9 +379,7 @@ export default function Page() {
                       <div className="text-3xl font-extrabold">{maturityHoursTeam.toLocaleString()}</div>
                     </div>
                   </div>
-                  <div className="mt-3 text-xs text-zinc-500">
-                    Refine via priorities and training below.
-                  </div>
+                  <div className="mt-3 text-xs text-zinc-500">Refine via priorities and training below.</div>
                 </div>
               </div>
 
@@ -454,7 +451,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* Step 4–6 headers + estimate boxes */}
+          {/* Step 4–6 */}
           {(step === 4 || step === 5 || step === 6) && (
             <div>
               <div className="flex items-center gap-6 mb-6">
@@ -464,6 +461,7 @@ export default function Page() {
                   {step === 6 && "Upskilling"}
                 </h2>
 
+                {/* Estimate boxes */}
                 <div className="flex gap-3">
                   {(["low", "avg", "high"] as const).map((lvl) => (
                     <button
