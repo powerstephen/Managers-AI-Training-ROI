@@ -2,24 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Dark theme tokens (higher contrast) ── */
+/* ── Dark theme tokens ── */
 :root{
-  --bg-page:#000000;      /* page black */
-  --bg-panel:#1f1f1f;     /* medium grey (replaces #191919) */
-  --bg-card:#121212;      /* inner card */
+  --bg-page:#000000;      /* page background */
+  --bg-panel:#000000;     /* big boxes: pure black */
+  --bg-card:#0e0e0e;      /* inner cards */
   --bg-chip:#04E1F9;      /* vivid azure */
-  --bg-chip-muted:#116a77;
   --text:#ffffff;
+  --text-dark:#0b0b0b;    /* for light inputs */
   --text-dim:#b9c0d0;
-  --border:#2b2b2b;
+  --border:#2a2a2a;
   --border-strong:#3a3f47;
   --focus:#04E1F9;
+  --input-light:#a6a6a6;  /* small inputs background */
 }
 
 @layer utilities{ .shadow-soft{ box-shadow:0 10px 30px rgba(0,0,0,.35);} }
 
 @layer components{
-  .panel{@apply rounded-2xl p-6 md:p-8 shadow-soft; background:var(--bg-panel);}
+  .panel{@apply rounded-2xl p-6 md:p-8 shadow-soft; background:var(--bg-panel); border:1px solid var(--border);}
   .card{@apply rounded-2xl p-4; background:var(--bg-card); border:1px solid var(--border);}
   .kpi{@apply rounded-2xl p-4; background:var(--bg-card); border:1px solid var(--border);}
 
@@ -28,35 +29,33 @@
   .hint{@apply text-xs mt-1; color:var(--text-dim);}
   .muted{ color:var(--text-dim); }
 
+  /* small inputs */
   .inp{
-    @apply w-full rounded-xl px-3 py-2.5 outline-none;
-    background:#0c0e12;border:1px solid var(--border);color:var(--text);
+    @apply w-full rounded-xl px-3 py-2.5 outline-none placeholder:opacity-80;
+    background:var(--input-light); color:var(--text-dark); border:1px solid var(--border);
   }
   .inp:focus{ box-shadow:0 0 0 3px rgba(4,225,249,.35); border-color:var(--focus); }
 
   .btn{@apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-semibold; background:var(--bg-chip); color:white;}
   .btn:hover{ filter:brightness(1.05);}
   .btn-ghost{@apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-semibold border; background:transparent; color:var(--text); border-color:var(--border);}
-  .btn-subtle{@apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-semibold; background:#22252c; color:var(--text);}
 
   .pill{@apply rounded-full px-3 py-1.5 text-sm font-semibold border; border-color:var(--border); color:var(--text); background:#0c0e12;}
   .pill--active{ background:#10262a; border-color:var(--focus); }
 
   .step-chip{@apply w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-semibold;}
   .step-chip--on{ background:var(--bg-chip);}
-  .step-chip--off{ background:var(--bg-chip-muted);}
+  .step-chip--off{ background:#116a77;}
   .step-label{@apply text-sm font-medium; color:var(--text);}
 
   .priority{@apply text-left rounded-2xl p-4 border; background:var(--bg-card); border-color:var(--border);}
   .priority--active{ border-color:var(--focus); box-shadow:0 0 0 3px rgba(4,225,249,.25) inset;}
-  .tag{@apply text-[11px] font-semibold rounded-full px-2 py-0.5; background:var(--bg-chip); color:white;}
-  .tag--ghost{ background:#22252c; color:var(--text);}
 
   .kpi__label{@apply text-xs font-semibold; color:var(--text-dim);}
   .kpi__value{@apply text-2xl font-extrabold mt-1; color:var(--text);}
 }
 
-/* Slim range slider themed to azure */
+/* Slim azure slider */
 input[type="range"].range-slim{
   -webkit-appearance:none;width:100%;height:10px;background:#2a2f36;border-radius:9999px;outline:none;
 }
@@ -67,4 +66,8 @@ input[type="range"].range-slim::-moz-range-thumb{
   width:22px;height:22px;border-radius:9999px;background:var(--bg-chip);border:3px solid #fff;box-shadow:0 2px 8px rgba(4,225,249,.4);cursor:pointer;
 }
 
+/* hero */
+.hero-img{ width:100%; height:auto; object-fit:contain; border-radius:16px; }
+
+/* page */
 html,body{ background:var(--bg-page); color:var(--text);}
