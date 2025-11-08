@@ -30,7 +30,7 @@ type PriorityKey =
   | "upskilling"
   | "costAvoidance";
 
-/** Priorities user can *configure* on steps 4–6 (order matters).  */
+/** Only these have dedicated config steps (4–6) and in this order */
 const CONFIGURABLE: PriorityKey[] = ["throughput", "retention", "upskilling"];
 
 const PRIORITY_META: Record<
@@ -101,7 +101,7 @@ export default function Page() {
   const [trainingPerEmployee, setTrainingPerEmployee] = useState(850);
   const [programMonths, setProgramMonths] = useState(3);
 
-  /* Step 2 (AI Adoption / Maturity) */
+  /* Step 2 (AI Adoption) */
   const [maturity, setMaturity] = useState(5);
 
   /* Step 3 (priorities) */
@@ -156,9 +156,9 @@ export default function Page() {
         ? Math.round(baseWeeklyTeamHours * 0.2)
         : 0,
 
-      // Onboarding (toned down – previously too large):
-      // Assume 4 weeks of ramp reduction * 10 h/week per new hire * 15% new hires of headcount per year,
-      // spread over 52 weeks => weekly equivalent.
+      // Onboarding (toned down vs previous version):
+      // 4 weeks faster ramp * 10 h/week per new hire * 15% new hires of headcount per year,
+      // spread over 52 weeks -> weekly equivalent.
       onboarding: selected.includes("onboarding")
         ? Math.round(((4 * 10) * (headcount * 0.15)) / 52)
         : 0,
@@ -222,46 +222,23 @@ export default function Page() {
   ------------------------------*/
   /** From the current config step (4–6), jump to the next *selected* config step or to Results (7). */
   const goToNextSelectedConfig = (currentStep: number) => {
-    const order: Record<number, PriorityKey> = {
-      4: "throughput",
-      5: "retention",
-      6: "upskilling",
-    };
-    const remaining: { step: number; key: PriorityKey }[] = [
-      { step: 5, key: "retention" },
-      { step: 6, key: "upskilling" },
-    ].filter((x) => (currentStep < x.step ? selected.includes(x.key) : false));
-
-    // If current step is 4 and 4 wasn't actually selected, we should still skip forward.
-    if (currentStep === 4 && !selected.includes("throughput")) {
-      if (selected.includes("retention")) return setStep(5);
-      if (selected.includes("upskilling")) return setStep(6);
-      return setStep(7);
-    }
-
-    // Generic: find the next selected config step ahead; else go to results
-    for (const r of remaining) {
-      if (selected.includes(r.key)) {
-        setStep(r.step);
-        return;
-      }
-    }
+    // Decide the next selected config step in fixed order
+    if (currentStep <= 4 && selected.includes("retention")) return setStep(5);
+    if (currentStep <= 5 && selected.includes("upskilling")) return setStep(6);
     setStep(7);
   };
 
   /** From priorities step (3), decide where to go next based on selections. */
   const goFromPriorities = () => {
-    // Use typed CONFIGURABLE list to avoid the TS error you hit.
     const future = CONFIGURABLE.filter((k) => selected.includes(k));
     if (future.length === 0) {
       setStep(7);
       return;
     }
-    // First selected config step in fixed order
-    if (selected.includes("throughput")) return setStep(4);
-    if (selected.includes("retention")) return setStep(5);
-    if (selected.includes("upskilling")) return setStep(6);
-    setStep(7);
+    if (selected.includes("throughput")) setStep(4);
+    else if (selected.includes("retention")) setStep(5);
+    else if (selected.includes("upskilling")) setStep(6);
+    else setStep(7);
   };
 
   const steps = [
@@ -303,7 +280,6 @@ export default function Page() {
                 </div>
               ))}
           </div>
-          {/* spacer to push to edges */}
           <div />
         </div>
       </div>
@@ -320,11 +296,13 @@ export default function Page() {
                 <div className="card">
                   <label className="lbl">Department</label>
                   <select className="inp" value={dept} onChange={(e) => setDept(e.target.value as Dept)}>
-                    {["Company-wide", "Marketing", "Sales", "Customer Support", "Operations", "Engineering", "HR"].map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
+                    {["Company-wide", "Marketing", "Sales", "Customer Support", "Operations", "Engineering", "HR"].map(
+                      (d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      )
+                    )}
                   </select>
                   <p className="hint">Choose a function or “Company-wide”.</p>
                 </div>
@@ -358,9 +336,7 @@ export default function Page() {
               <h3 className="text-lg font-bold mt-8 mb-2">Program cost assumptions</h3>
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="card">
-                  <label className="lbl">
-                    Average annual salary ({symbol})
-                  </label>
+                  <label className="lbl">Average annual salary ({symbol})</label>
                   <input
                     className="inp"
                     type="number"
@@ -369,9 +345,7 @@ export default function Page() {
                   />
                 </div>
                 <div className="card">
-                  <label className="lbl">
-                    Training per employee ({symbol})
-                  </label>
+                  <label className="lbl">Training per employee ({symbol})</label>
                   <input
                     className="inp"
                     type="number"
@@ -502,29 +476,15 @@ export default function Page() {
                   ← Back
                 </button>
 
-                {/* FIXED: typed future list (no 'string' vs 'PriorityKey' error) */}
-                <button
-                  className="btn"
-                  onClick={() => {
-                    const future = CONFIGURABLE.filter((k) => selected.includes(k));
-                    if (future.length === 0) {
-                      setStep(7); // straight to results
-                    } else {
-                      // go to the first selected config step
-                      if (selected.includes("throughput")) setStep(4);
-                      else if (selected.includes("retention")) setStep(5);
-                      else if (selected.includes("upskilling")) setStep(6);
-                      else setStep(7);
-                    }
-                  }}
-                >
+                {/* ✅ Typed, no string array */}
+                <button className="btn" onClick={goFromPriorities}>
                   Continue →
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 4: Throughput (skip if not selected) */}
+          {/* STEP 4: Throughput */}
           {step === 4 && selected.includes("throughput") && (
             <div>
               <h2 className="title">Throughput</h2>
@@ -565,7 +525,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 5: Retention (skip if not selected) */}
+          {/* STEP 5: Retention */}
           {step === 5 && selected.includes("retention") && (
             <div>
               <h2 className="title">Retention</h2>
@@ -605,7 +565,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* STEP 6: Upskilling (skip if not selected) */}
+          {/* STEP 6: Upskilling */}
           {step === 6 && selected.includes("upskilling") && (
             <div>
               <h2 className="title">Upskilling</h2>
