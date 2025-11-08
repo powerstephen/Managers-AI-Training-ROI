@@ -71,3 +71,50 @@ input[type="range"].range-slim::-moz-range-thumb{
 
 /* page */
 html,body{ background:var(--bg-page); color:var(--text);}
+
+/* --- Compact estimate slider (Steps 4–6) --- */
+.est-ctl {
+  max-width: 280px;        /* keep it compact */
+}
+
+.est-rail {
+  position: relative;
+  height: 26px;            /* space for line + dots */
+  display: flex;
+  align-items: center;
+}
+
+.est-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #04e1f9;     /* vivid azure line */
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.9;
+}
+
+/* 3 positions: left, center, right */
+.est-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #0b0f14;                   /* dark core dot */
+  border: 2px solid #04e1f9;             /* vivid azure ring */
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+  transition: transform 120ms ease;
+}
+.est-dot:first-child { align-self: center; margin-right: auto; }
+.est-dot:nth-child(3) { margin: 0 auto; }           /* center dot */
+.est-dot:last-child  { align-self: center; margin-left: auto; }
+
+.est-dot:hover { transform: scale(1.05); }
+
+.est-dot--on {
+  background: #04e1f9;                   /* solid filled when selected */
+  border-color: #04e1f9;
+}
