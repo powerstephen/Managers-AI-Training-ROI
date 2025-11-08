@@ -156,9 +156,7 @@ export default function Page() {
         ? Math.round(baseWeeklyTeamHours * 0.2)
         : 0,
 
-      // Onboarding (toned down vs previous version):
-      // 4 weeks faster ramp * 10 h/week per new hire * 15% new hires of headcount per year,
-      // spread over 52 weeks -> weekly equivalent.
+      // Onboarding toned down: ~4 weeks faster ramp * 10h/wk * 15% new hires / 52 weeks
       onboarding: selected.includes("onboarding")
         ? Math.round(((4 * 10) * (headcount * 0.15)) / 52)
         : 0,
@@ -476,7 +474,7 @@ export default function Page() {
                   ← Back
                 </button>
 
-                {/* ✅ Typed, no string array */}
+                {/* ✅ Typed, calls helper */}
                 <button className="btn" onClick={goFromPriorities}>
                   Continue →
                 </button>
