@@ -28,12 +28,12 @@ type WizardStep =
   | "adoption"
   | "priorities"
   | "throughput"
-  | "retention"
-  | "upskilling"
-  | "results"
   | "quality"
   | "onboarding"
-  | "costAvoidance";
+  | "retention"
+  | "upskilling"
+  | "costAvoidance"
+  | "results";
 
 const PRIORITY_META: Record<
   PriorityKey,
@@ -87,6 +87,7 @@ function Pill({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/* Adoption scale → weekly hours per employee */
 const maturityToHours = (lvl: number) => {
   const map = [5, 4.5, 4, 3.5, 3, 2.6, 2.2, 1.8, 1.4, 1];
   return map[Math.min(10, Math.max(1, lvl)) - 1];
@@ -107,6 +108,7 @@ const maturityExplainer = [
 
 /* ---------- Component ---------- */
 export default function Page() {
+  /* Step & navigation */
   const [stepKey, setStepKey] = useState<WizardStep>("team");
   const go = (key: WizardStep) => setStepKey(key);
   const reset = () => window.location.reload();
@@ -116,9 +118,11 @@ export default function Page() {
   const [headcount, setHeadcount] = useState(150);
   const [currency, setCurrency] = useState<Currency>("EUR");
   const [avgSalary, setAvgSalary] = useState(52000);
-  const seatUSD = headcount >= 1000 ? 299 : headcount >= 100 ? 349 : 399;
+
+  const seatUSD = headcount >= 1000 ? 299 : headcount >= 100 ? 349 : 399; // tiering
   const symbol = CURRENCY_SYMBOL[currency];
 
+  /* Derived costs */
   const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
   const programCost = useMemo(() => headcount * seatUSD, [headcount, seatUSD]);
 
@@ -129,10 +133,12 @@ export default function Page() {
     () => Math.round(maturityHoursPerPerson * headcount),
     [maturityHoursPerPerson, headcount]
   );
-  const numberTrained = headcount; // in-scope = all trained
+
+  /* In-scope = trained */
+  const numberTrained = headcount;
 
   /* Step 3: priorities */
-  const keys: PriorityKey[] = [
+  const allPriorityKeys: PriorityKey[] = [
     "throughput",
     "quality",
     "onboarding",
@@ -140,13 +146,14 @@ export default function Page() {
     "upskilling",
     "costAvoidance",
   ];
+
   const [selected, setSelected] = useState<PriorityKey[]>(
-    keys.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 3)
+    allPriorityKeys.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 3)
   );
 
-  /* Dynamic progress based on chosen priorities */
+  /* Dynamic steps based on actual selection (order as picked) */
   const ALL_STEPS: { id: number; key: WizardStep; label: string }[] = useMemo(() => {
-    const dynamicPriorities = selected.map((p) => ({
+    const dyn = selected.map((p) => ({
       key: p as WizardStep,
       label: PRIORITY_META[p].label,
     }));
@@ -154,21 +161,24 @@ export default function Page() {
       { key: "team", label: "Team" },
       { key: "adoption", label: "AI Adoption" },
       { key: "priorities", label: "Team Priorities" },
-      ...dynamicPriorities,
+      ...dyn,
       { key: "results", label: "Results" },
-    ];
-    return base.map((s, i) => ({ id: i + 1, ...s }));
+    ] as const;
+    return base.map((s, i) => ({ id: i + 1, key: s.key, label: s.label }));
   }, [selected]);
 
-  /* Step 4..6 config values */
+  /* Priority inputs for the three configurable ones */
+  // Throughput
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
+  // Retention
   const [retentionLiftPct, setRetentionLiftPct] = useState(2);
   const [baselineAttritionPct, setBaselineAttritionPct] = useState(12);
+  // Upskilling
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(1.5);
 
-  /* Derived values */
+  /* Hours model */
   const baseWeeklyTeamHours = useMemo(
     () => maturityHoursPerPerson * headcount,
     [maturityHoursPerPerson, headcount]
@@ -185,8 +195,7 @@ export default function Page() {
         ? Math.round(
             ((headcount * (baselineAttritionPct / 100)) *
               (retentionLiftPct / 100) *
-              120) /
-              52
+              120) / 52
           )
         : 0,
       upskilling: selected.includes("upskilling")
@@ -260,30 +269,37 @@ export default function Page() {
           box-shadow: 0 0 12px ${AZURE}, 0 0 4px ${AZURE} inset;
           transition: width 150ms ease;
         }
+        /* Range exactly on the rail so the thumb sits centered */
+        .range-wrap { position: relative; height: 10px; }
         input.range-slim {
           -webkit-appearance: none;
           appearance: none;
-          width: 100%;
-          height: 10px;
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 10px; /* match rail */
           background: transparent;
+          margin: 0;
+          padding: 0;
         }
+        input.range-slim::-webkit-slider-runnable-track { height: 10px; background: transparent; }
+        input.range-slim::-moz-range-track { height: 10px; background: transparent; }
         input.range-slim::-webkit-slider-thumb {
           -webkit-appearance: none;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: ${AZURE};
-          border: 2px solid #000;
-          box-shadow: 0 0 12px ${AZURE};
-          margin-top: -4px;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: ${AZURE}; border: 2px solid #000; box-shadow: 0 0 12px ${AZURE};
+          margin-top: -4px; /* centers thumb on 10px rail */
         }
-        .results-grid {
-          grid-template-columns: repeat(4, 1fr);
+        input.range-slim::-moz-range-thumb {
+          width: 18px; height: 18px; border-radius: 50%;
+          background: ${AZURE}; border: 2px solid #000; box-shadow: 0 0 12px ${AZURE};
         }
+
+        /* Results grid: 4 x 2 (responsive down to 2 x 4) */
+        .results-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         @media (max-width: 1024px) {
-          .results-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
+          .results-grid { grid-template-columns: repeat(2, 1fr); }
         }
       `}</style>
 
@@ -294,13 +310,7 @@ export default function Page() {
             <div className="flex flex-wrap items-center gap-4">
               {ALL_STEPS.map((s) => (
                 <div key={s.id} className="flex items-center gap-2">
-                  <span
-                    className={`step-chip ${
-                      stepIndex >= s.id ? "step-chip--on" : "step-chip--off"
-                    }`}
-                  >
-                    {s.id}
-                  </span>
+                  <span className={`step-chip ${stepIndex >= s.id ? "step-chip--on" : "step-chip--off"}`}>{s.id}</span>
                   <span className="step-label">{s.label}</span>
                 </div>
               ))}
@@ -317,51 +327,28 @@ export default function Page() {
       {/* Main content */}
       <div className="w-full max-w-6xl mx-auto px-4 mt-4 pb-16">
         <div className="panel">
-          {/* TEAM STEP */}
+          {/* TEAM */}
           {stepKey === "team" && (
             <div>
               <h2 className="title">Team</h2>
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="card">
                   <label className="lbl">Department</label>
-                  <select
-                    className="inp"
-                    value={dept}
-                    onChange={(e) => setDept(e.target.value as Dept)}
-                  >
-                    {[
-                      "Company-wide",
-                      "Marketing",
-                      "Sales",
-                      "Customer Support",
-                      "Operations",
-                      "Engineering",
-                      "HR",
-                    ].map((d) => (
+                  <select className="inp" value={dept} onChange={(e) => setDept(e.target.value as Dept)}>
+                    {["Company-wide","Marketing","Sales","Customer Support","Operations","Engineering","HR"].map((d) => (
                       <option key={d}>{d}</option>
                     ))}
                   </select>
                 </div>
                 <div className="card">
                   <label className="lbl">Employees in scope</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    value={headcount}
-                    onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))}
-                  />
+                  <input className="inp" type="number" value={headcount} onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))} />
                 </div>
                 <div className="card">
                   <label className="lbl">Currency</label>
                   <div className="flex gap-2 flex-wrap">
-                    {(["EUR", "USD", "GBP", "AUD"] as Currency[]).map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => setCurrency(c)}
-                        className={`pill ${currency === c ? "pill--active" : ""}`}
-                      >
-                        {c}
-                      </button>
+                    {(["EUR","USD","GBP","AUD"] as Currency[]).map((c) => (
+                      <button key={c} onClick={() => setCurrency(c)} className={`pill ${currency === c ? "pill--active" : ""}`}>{c}</button>
                     ))}
                   </div>
                 </div>
@@ -369,104 +356,269 @@ export default function Page() {
               <div className="grid md:grid-cols-3 gap-4 mt-6">
                 <div className="card md:col-span-1">
                   <label className="lbl">Average annual salary</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    value={avgSalary}
-                    onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))}
-                  />
+                  <input className="inp" type="number" value={avgSalary} onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))} />
+                  <div className="hint text-xs mt-2">Used to value hours saved.</div>
                 </div>
               </div>
-              <div className="mt-6 flex justify-end gap-3">
-                <button className="btn" onClick={() => go("adoption")}>
-                  Continue →
-                </button>
+              <div className="mt-6 flex justify-end">
+                <button className="btn" onClick={() => go("adoption")}>Continue →</button>
               </div>
             </div>
           )}
 
-          {/* ADOPTION STEP */}
+          {/* ADOPTION */}
           {stepKey === "adoption" && (
             <div>
               <h2 className="title">AI Adoption</h2>
-              <div className="card">
-                <label className="lbl mb-2">Where are you today? (1–10)</label>
-                <input
-                  type="range"
-                  min={1}
-                  max={10}
-                  value={adoption}
-                  onChange={(e) => setAdoption(parseInt(e.target.value, 10))}
-                  className="range-slim"
-                />
-                <div className="mt-3 text-sm">
-                  <strong>Selected {adoption}:</strong>{" "}
-                  {maturityExplainer[adoption - 1]}
+              <p className="muted text-sm mb-3">Slide to estimate current AI-in-workflow adoption.</p>
+
+              <div className="grid md:grid-cols-[1fr_360px] gap-6">
+                <div className="card">
+                  <label className="lbl mb-2">Where are you today? (1–10)</label>
+                  <div className="range-wrap">
+                    <div className="progress-rail">
+                      <div className="progress-fill" style={{ width: `${((adoption - 1) / 9) * 100}%` }} />
+                    </div>
+                    <input type="range" min={1} max={10} value={adoption} onChange={(e) => setAdoption(parseInt(e.target.value, 10))} className="range-slim" />
+                  </div>
+                  <div className="flex justify-between mt-2 font-semibold" style={{ color: "var(--text-dim)", fontSize: "15px" }}>
+                    {Array.from({ length: 10 }).map((_, i) => <span key={i}>{i + 1}</span>)}
+                  </div>
+                  <div className="mt-4 text-[15px]">
+                    <span className="font-bold">Selected: {adoption} — </span>{maturityExplainer[adoption - 1]}
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="text-sm font-semibold muted">Estimated hours saved</div>
+                  <div className="grid grid-cols-2 gap-4 mt-3">
+                    <div className="card">
+                      <div className="text-xs muted">Per employee / week</div>
+                      <div className="text-3xl font-extrabold">{maturityHoursPerPerson.toFixed(1)}</div>
+                    </div>
+                    <div className="card">
+                      <div className="text-xs muted">Team / week</div>
+                      <div className="text-3xl font-extrabold">{maturityHoursTeam.toLocaleString()}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="mt-6 flex justify-end gap-3">
-                <button className="btn" onClick={() => go("priorities")}>
-                  Continue →
-                </button>
+
+              <div className="mt-6 flex justify-end">
+                <button className="btn" onClick={() => go("priorities")}>Continue →</button>
               </div>
             </div>
           )}
 
-          {/* PRIORITIES STEP */}
+          {/* PRIORITIES */}
           {stepKey === "priorities" && (
             <div>
               <h2 className="title">Team Priorities</h2>
-              <p className="muted text-sm mb-4">
-                Choose <b>exactly three</b> areas to focus.
-              </p>
+              <p className="muted text-sm mb-4">Choose <b>exactly three</b> areas to focus.</p>
+
               <div className="grid md:grid-cols-3 gap-3">
-                {keys.map((k) => {
+                {allPriorityKeys.map((k) => {
                   const active = selected.includes(k);
                   const disabled = !active && selected.length >= 3;
                   return (
-                    <div
-                      key={k}
-                      className={`priority ${active ? "priority--active" : ""} ${
-                        disabled ? "opacity-40 cursor-not-allowed" : ""
-                      }`}
-                    >
+                    <div key={k} className={`priority ${active ? "priority--active" : ""} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold">
-                          {PRIORITY_META[k].label}
-                        </span>
+                        <span className="font-semibold">{PRIORITY_META[k].label}</span>
                         <button
                           onClick={() => {
-                            if (active)
-                              setSelected(selected.filter((x) => x !== k));
+                            if (active) setSelected(selected.filter((x) => x !== k));
                             else if (!disabled) setSelected([...selected, k]);
                           }}
-                          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                            active
-                              ? "bg-[var(--bg-chip)] text-white"
-                              : "bg-[#22252c] text-white"
-                          }`}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${active ? "bg-[var(--bg-chip)] text-white" : "bg-[#22252c] text-white"}`}
                         >
                           {active ? "Selected" : "Select"}
                         </button>
                       </div>
-                      <div className="text-sm muted mt-1">
-                        {PRIORITY_META[k].blurb}
-                      </div>
+                      <div className="text-sm muted mt-1">{PRIORITY_META[k].blurb}</div>
                     </div>
                   );
                 })}
               </div>
-              <div className="mt-6 flex justify-end gap-3">
-                <button
-                  className="btn"
-                  onClick={CONTINUE}
-                  disabled={selected.length !== 3}
-                >
-                  Continue →
-                </button>
+
+              <div className="mt-6 flex justify-end">
+                <button className="btn" onClick={CONTINUE} disabled={selected.length !== 3}>Continue →</button>
               </div>
             </div>
           )}
 
-          {/* RESULTS STEP */}
-         
+          {/* PRIORITY DETAIL SCREENS */}
+          {stepKey === "throughput" && selected.includes("throughput") && (
+            <div>
+              <h2 className="title">Throughput</h2>
+              <p className="muted text-sm mb-4">Quick edit of assumptions for throughput impact.</p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="card">
+                  <label className="lbl">Time reclaimed %</label>
+                  <input className="inp" type="number" min={0} max={30} value={throughputPct} onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+                <div className="card">
+                  <label className="lbl">Handoffs reduced %</label>
+                  <input className="inp" type="number" min={0} max={30} value={handoffPct} onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={CONTINUE}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {stepKey === "retention" && selected.includes("retention") && (
+            <div>
+              <h2 className="title">Retention</h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="card">
+                  <label className="lbl">Attrition avoided %</label>
+                  <input className="inp" type="number" min={0} max={30} value={retentionLiftPct} onChange={(e) => setRetentionLiftPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+                <div className="card">
+                  <label className="lbl">Baseline attrition %</label>
+                  <input className="inp" type="number" min={0} max={40} value={baselineAttritionPct} onChange={(e) => setBaselineAttritionPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={CONTINUE}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {stepKey === "upskilling" && selected.includes("upskilling") && (
+            <div>
+              <h2 className="title">Upskilling</h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="card">
+                  <label className="lbl">Coverage target %</label>
+                  <input className="inp" type="number" min={0} max={100} value={upskillCoveragePct} onChange={(e) => setUpskillCoveragePct(parseInt(e.target.value || "0", 10))} />
+                </div>
+                <div className="card">
+                  <label className="lbl">Hours / week per person</label>
+                  <input className="inp" type="number" min={0} step={0.1} value={upskillHoursPerWeek} onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))} />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={CONTINUE}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lightweight screens for non-config priorities */}
+          {stepKey === "quality" && selected.includes("quality") && (
+            <div>
+              <h2 className="title">Quality</h2>
+              <p className="muted text-sm mb-4">{PRIORITY_META.quality.blurb}</p>
+              <div className="card">
+                <div className="text-sm muted">No extra inputs needed — quality uplift is baked into the model.</div>
+              </div>
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={CONTINUE}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {stepKey === "onboarding" && selected.includes("onboarding") && (
+            <div>
+              <h2 className="title">Onboarding</h2>
+              <p className="muted text-sm mb-4">{PRIORITY_META.onboarding.blurb}</p>
+              <div className="card">
+                <div className="text-sm muted">No extra inputs needed — a modest baseline is included.</div>
+              </div>
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={CONTINUE}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {stepKey === "costAvoidance" && selected.includes("costAvoidance") && (
+            <div>
+              <h2 className="title">Cost Avoidance</h2>
+              <p className="muted text-sm mb-4">{PRIORITY_META.costAvoidance.blurb}</p>
+              <div className="card">
+                <div className="text-sm muted">No extra inputs needed — a conservative baseline is included.</div>
+              </div>
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={CONTINUE}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {/* RESULTS */}
+          {stepKey === "results" && (
+            <div>
+              <h2 className="title">Results</h2>
+
+              {/* 8 equal tiles (4 × 2) */}
+              <div className="results-grid">
+                <Pill label="Total Value" value={<>{symbol}{Math.round(annualValue).toLocaleString()}</>} />
+                <Pill label="Total Hours Saved" value={(weeklyTotal * 52).toLocaleString()} />
+                <Pill label="Payback Period" value={isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"} />
+                <Pill label="No. Trained" value={numberTrained.toLocaleString()} />
+                <Pill label="Annual ROI" value={<>{annualROI.toFixed(1)}×</>} />
+                <Pill label="Cost per Seat" value={<>{symbol}{seatUSD.toLocaleString()}</>} />
+                <Pill label="Program Cost" value={<>{symbol}{(seatUSD * headcount).toLocaleString()}</>} />
+                <Pill label="Estimated Productivity Gain" value={`${productivityGainPct.toFixed(1)}%`} />
+              </div>
+
+              {/* Breakdown table */}
+              <div className="mt-6 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+                <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold table-header">
+                  <div>PRIORITY</div>
+                  <div className="text-right">HOURS SAVED</div>
+                  <div className="text-right">ANNUAL VALUE</div>
+                </div>
+
+                {allPriorityKeys.filter((k) => selected.includes(k)).map((k) => {
+                  const hours = Math.round(weeklyHours[k] * 52);
+                  const value = hours * hourlyCost;
+                  return (
+                    <div key={k} className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-row">
+                      <div>
+                        <div className="font-bold">{PRIORITY_META[k].label}</div>
+                        <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
+                      </div>
+                      <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
+                      <div className="text-right font-semibold">
+                        {symbol}{Math.round(value).toLocaleString()}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-total">
+                  <div className="font-extrabold">Total</div>
+                  <div className="text-right font-extrabold">{(weeklyTotal * 52).toLocaleString()} h</div>
+                  <div className="text-right font-extrabold">
+                    {symbol}{Math.round(annualValue).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="card mt-6">
+                <div className="text-sm font-bold mb-2">Next steps</div>
+                <ul className="list-disc pl-5 space-y-1 text-sm muted">
+                  <li>Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.</li>
+                  <li>Launch “AI Champions” cohort; track usage & correlate with retention quarterly.</li>
+                  <li>Set competency coverage target to 60% and measure weekly AI-in-task usage.</li>
+                </ul>
+              </div>
+
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={reset}>Start over</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
