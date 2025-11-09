@@ -36,22 +36,22 @@ const PRIORITY_META: Record<
 > = {
   throughput: {
     label: "Throughput",
-    blurb: "Ship faster; reduce cycle time and waiting time.",
+    blurb: "Reduce cycle time and handoffs to ship faster.",
     defaultOn: true,
   },
   quality: {
     label: "Quality",
-    blurb: "Fewer reworks; better first-pass yield.",
+    blurb: "Reduce rework via better first-pass yield and QA.",
     defaultOn: true,
   },
   onboarding: {
     label: "Onboarding",
-    blurb: "Ramp new hires faster with AI assist.",
+    blurb: "Accelerate ramp time with guided workflows and AI assist.",
     defaultOn: true,
   },
   retention: {
     label: "Retention",
-    blurb: "Reduce regretted attrition via better tooling.",
+    blurb: "Reduce regretted attrition through better tooling and enablement.",
   },
   upskilling: {
     label: "Upskilling",
@@ -59,7 +59,7 @@ const PRIORITY_META: Record<
   },
   costAvoidance: {
     label: "Cost avoidance",
-    blurb: "Avoid outside spend/overtime via automation.",
+    blurb: "Avoid outside spend/overtime via automation and self-service.",
   },
 };
 
@@ -161,7 +161,7 @@ export default function Page() {
     return base.map((s, i) => ({ id: i + 1, key: s.key, label: s.label }));
   }, [selected]);
 
-  /* Priority inputs for the three configurable ones */
+  /* Priority inputs (now every priority has adjustable inputs) */
   // Throughput + aggression
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
@@ -174,8 +174,14 @@ export default function Page() {
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(1.5);
   const [upskillingAgg, setUpskillingAgg] = useState<"low" | "avg" | "high">("avg");
+  // Quality (now adjustable)
+  const [qualityPct, setQualityPct] = useState(20); // % of base weekly hours regained
+  // Onboarding (now adjustable)
+  const [onboardingHoursPerPerson, setOnboardingHoursPerPerson] = useState(0.5); // hours / week / employee
+  // Cost Avoidance (now adjustable)
+  const [costAvoidancePct, setCostAvoidancePct] = useState(5); // % of base weekly hours avoided
 
-  /* Aggression preset handler */
+  /* Aggression preset handler (kept for the 3 main) */
   const applyAgg = (k: PriorityKey, level: "low" | "avg" | "high") => {
     if (k === "throughput") {
       setThroughputAgg(level);
@@ -197,7 +203,7 @@ export default function Page() {
     }
   };
 
-  /* Hours model */
+  /* Hours model (uses the adjustable inputs above) */
   const baseWeeklyTeamHours = useMemo(
     () => maturityHoursPerPerson * headcount,
     [maturityHoursPerPerson, headcount]
@@ -208,8 +214,12 @@ export default function Page() {
       throughput: selected.includes("throughput")
         ? Math.round(baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100))
         : 0,
-      quality: selected.includes("quality") ? Math.round(baseWeeklyTeamHours * 0.2) : 0,
-      onboarding: selected.includes("onboarding") ? Math.round(8 * headcount) : 0,
+      quality: selected.includes("quality")
+        ? Math.round(baseWeeklyTeamHours * (qualityPct / 100))
+        : 0,
+      onboarding: selected.includes("onboarding")
+        ? Math.round(onboardingHoursPerPerson * headcount)
+        : 0,
       retention: selected.includes("retention")
         ? Math.round(
             ((headcount * (baselineAttritionPct / 100)) *
@@ -218,10 +228,10 @@ export default function Page() {
           )
         : 0,
       upskilling: selected.includes("upskilling")
-        ? Math.round((upskillCoveragePct / 100) * headcount * Math.max(1, upskillHoursPerWeek))
+        ? Math.round((upskillCoveragePct / 100) * headcount * Math.max(0, upskillHoursPerWeek))
         : 0,
       costAvoidance: selected.includes("costAvoidance")
-        ? Math.round(baseWeeklyTeamHours * 0.05)
+        ? Math.round(baseWeeklyTeamHours * (costAvoidancePct / 100))
         : 0,
     };
     return v;
@@ -235,6 +245,9 @@ export default function Page() {
     baselineAttritionPct,
     upskillCoveragePct,
     upskillHoursPerWeek,
+    qualityPct,
+    onboardingHoursPerPerson,
+    costAvoidancePct,
   ]);
 
   const weeklyTotal = useMemo(
@@ -321,7 +334,7 @@ export default function Page() {
         @media (max-width: 1024px) { .results-grid { grid-template-columns: repeat(2, 1fr); } }
       `}</style>
 
-      {/* HERO (image from /public/hero.png) */}
+      {/* HERO (image in /public/hero.png) */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
         <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft" />
       </div>
@@ -473,7 +486,7 @@ export default function Page() {
           {stepKey === "throughput" && selected.includes("throughput") && (
             <div>
               <h2 className="title">Throughput</h2>
-              <p className="muted text-sm mb-4">Adjust assumptions for cycle time + handoff reduction.</p>
+              <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
@@ -510,6 +523,7 @@ export default function Page() {
           {stepKey === "retention" && selected.includes("retention") && (
             <div>
               <h2 className="title">Retention</h2>
+              <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
@@ -546,6 +560,7 @@ export default function Page() {
           {stepKey === "upskilling" && selected.includes("upskilling") && (
             <div>
               <h2 className="title">Upskilling</h2>
+              <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
@@ -578,14 +593,19 @@ export default function Page() {
             </div>
           )}
 
-          {/* Lightweight info screens for simple priorities (still included so no steps are skipped) */}
+          {/* PRIORITY DETAIL — QUALITY (now adjustable) */}
           {stepKey === "quality" && selected.includes("quality") && (
             <div>
               <h2 className="title">Quality</h2>
-              <p className="muted text-sm mb-4">{PRIORITY_META.quality.blurb}</p>
-              <div className="card">
-                <div className="text-sm muted">No extra inputs needed — a conservative baseline is included in the model.</div>
+              <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
+
+              <div className="grid md:grid-cols-1 gap-4">
+                <div className="card">
+                  <label className="lbl">Quality improvement (as % of base weekly hours)</label>
+                  <input className="inp" type="number" min={0} max={50} value={qualityPct} onChange={(e) => setQualityPct(parseInt(e.target.value || "0", 10))} />
+                </div>
               </div>
+
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
@@ -593,13 +613,19 @@ export default function Page() {
             </div>
           )}
 
+          {/* PRIORITY DETAIL — ONBOARDING (now adjustable) */}
           {stepKey === "onboarding" && selected.includes("onboarding") && (
             <div>
               <h2 className="title">Onboarding</h2>
-              <p className="muted text-sm mb-4">{PRIORITY_META.onboarding.blurb}</p>
-              <div className="card">
-                <div className="text-sm muted">No extra inputs needed — a modest baseline is included.</div>
+              <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
+
+              <div className="grid md:grid-cols-1 gap-4">
+                <div className="card">
+                  <label className="lbl">Hours / week saved per employee (onboarding/ramp)</label>
+                  <input className="inp" type="number" min={0} step={0.1} value={onboardingHoursPerPerson} onChange={(e) => setOnboardingHoursPerPerson(parseFloat(e.target.value || "0"))} />
+                </div>
               </div>
+
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
@@ -607,13 +633,19 @@ export default function Page() {
             </div>
           )}
 
+          {/* PRIORITY DETAIL — COST AVOIDANCE (now adjustable) */}
           {stepKey === "costAvoidance" && selected.includes("costAvoidance") && (
             <div>
               <h2 className="title">Cost Avoidance</h2>
-              <p className="muted text-sm mb-4">{PRIORITY_META.costAvoidance.blurb}</p>
-              <div className="card">
-                <div className="text-sm muted">No extra inputs needed — a conservative baseline is included.</div>
+              <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
+
+              <div className="grid md:grid-cols-1 gap-4">
+                <div className="card">
+                  <label className="lbl">Hours avoided (as % of base weekly hours)</label>
+                  <input className="inp" type="number" min={0} max={30} value={costAvoidancePct} onChange={(e) => setCostAvoidancePct(parseInt(e.target.value || "0", 10))} />
+                </div>
               </div>
+
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
