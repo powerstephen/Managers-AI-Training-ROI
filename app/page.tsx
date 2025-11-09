@@ -13,6 +13,14 @@ const CURRENCY_SYMBOL: Record<Currency, string> = {
   AUD: "A$",
 };
 
+/** FX rates (USD → target). Adjust if you want different spot rates. */
+const FX_FROM_USD: Record<Currency, number> = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  AUD: 1.55,
+};
+
 type Dept =
   | "Company-wide"
   | "Marketing"
@@ -106,6 +114,15 @@ const UPSKILL_PRESETS: Record<Band, { cov: number; hrs: number }> = {
   high: { cov: 75, hrs: 0.75 },
 };
 
+/* Training price tiers (USD per user per YEAR) */
+function usdPricePerUserYear(headcount: number): number {
+  if (headcount >= 1000) return 299;
+  if (headcount >= 100) return 349;
+  if (headcount >= 5) return 399;
+  // Fallback for very small scopes
+  return 399;
+}
+
 /* =========================
    Component
 ========================= */
@@ -115,7 +132,7 @@ export default function Page() {
     | "team"
     | "adoption"
     | "priorities"
-    | PriorityKey  // each chosen priority now gets its own step
+    | PriorityKey // each chosen priority now gets its own step
     | "results";
 
   const allPriorityKeys: PriorityKey[] = [
@@ -147,7 +164,6 @@ export default function Page() {
   const [headcount, setHeadcount] = useState(150);
   const [currency, setCurrency] = useState<Currency>("EUR");
   const [avgSalary, setAvgSalary] = useState(52000);
-  const [trainingPerEmployee, setTrainingPerEmployee] = useState(850);
   const [programMonths, setProgramMonths] = useState(3);
 
   /* ---- Adoption --------------------------------------------------------- */
@@ -184,7 +200,16 @@ export default function Page() {
     setUpHrsPerWeek(UPSKILL_PRESETS[b].hrs);
   };
 
-  /* ---- Calculations ----------------------------------------------------- */
+  /* ---- Pricing & calculations ------------------------------------------ */
+  const symbol = CURRENCY_SYMBOL[currency];
+
+  /** Auto price per user per YEAR in the selected currency */
+  const pricePerUserYear = useMemo(() => {
+    const usd = usdPricePerUserYear(headcount);
+    const fx = FX_FROM_USD[currency] ?? 1;
+    return usd * fx;
+  }, [headcount, currency]);
+
   const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
   const maturityHoursPerPerson = useMemo(() => maturityToHours(maturity), [maturity]);
   const baseWeeklyTeamHours = useMemo(
@@ -235,10 +260,13 @@ export default function Page() {
     [weeklyHours]
   );
   const monthlyValue = useMemo(() => weeklyTotal * hourlyCost * 4, [weeklyTotal, hourlyCost]);
+
+  /** Program cost uses the auto price per user per YEAR, scaled by program length */
   const programCost = useMemo(
-    () => headcount * trainingPerEmployee,
-    [headcount, trainingPerEmployee]
+    () => headcount * pricePerUserYear * (programMonths / 12),
+    [headcount, pricePerUserYear, programMonths]
   );
+
   const annualValue = useMemo(() => monthlyValue * 12, [monthlyValue]);
   const annualROI = useMemo(
     () => (programCost === 0 ? 0 : annualValue / programCost),
@@ -249,9 +277,14 @@ export default function Page() {
     [programCost, monthlyValue]
   );
 
-  const symbol = CURRENCY_SYMBOL[currency];
-
   /* ---- UI helpers ------------------------------------------------------- */
+  type StepKey =
+    | "team"
+    | "adoption"
+    | "priorities"
+    | PriorityKey
+    | "results";
+
   const stepLabel = (k: StepKey) =>
     ({
       team: "Team",
@@ -387,17 +420,21 @@ export default function Page() {
                     onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))}
                   />
                 </div>
+
+                {/* Auto training price per user / year */}
                 <div className="card">
-                  <label className="lbl">Training per employee ({symbol})</label>
+                  <label className="lbl">Training price (per user / year)</label>
                   <input
                     className="inp"
                     type="number"
-                    value={trainingPerEmployee}
-                    onChange={(e) =>
-                      setTrainingPerEmployee(parseInt(e.target.value || "0", 10))
-                    }
+                    value={Math.round(pricePerUserYear)}
+                    readOnly
                   />
+                  <p className="hint">
+                    Auto-tiered from USD: $399 (5–99), $349 (100–999), $299 (1,000+). Converted to your selected currency.
+                  </p>
                 </div>
+
                 <div className="card">
                   <label className="lbl">Program duration (months)</label>
                   <input
@@ -504,10 +541,9 @@ export default function Page() {
                       onClick={() => {
                         if (active) {
                           setSelected(selected.filter((x) => x !== k));
-                          // if current step is one of the removed future steps, nudge index back
                           setStepIndex((i) => Math.min(i, ["team","adoption","priorities"].length - 1));
                         } else if (!disabled) {
-                          setSelected([...selected, k]); // keep order of choice
+                          setSelected([...selected, k]);
                         }
                       }}
                     >
@@ -755,7 +791,7 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Scoped styles (keeps your dark theme + azure accents) */}
+      {/* Scoped styles (dark theme + azure accents) */}
       <style jsx global>{`
         :root {
           --bg-page: #0b0b0c;
