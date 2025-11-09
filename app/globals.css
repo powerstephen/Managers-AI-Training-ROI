@@ -1,13 +1,288 @@
+/* Tailwind layers */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Keep global CSS minimal and neutral (no brownish tints) */
-html, body {
-  height: 100%;
-  background: #000; /* page background */
-  color: #fff;
+/* =========================
+   Theme tokens
+   ========================= */
+:root {
+  --bg-page: #000000;          /* page: pure black */
+  --panel:   #111214;          /* outer panels */
+  --card:    #15171a;          /* inner cards/inputs */
+  --chip:    #1a1d22;          /* subtle pills */
+  --ink:     #ffffff;
+  --ink-dim: #b8b8b8;
+  --border:  #1e2126;
+  --border-strong: #242931;
+  --azure:   #04e1f9;          /* vivid azure accent */
 }
 
-/* Optional: smooth fonts */
-body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+/* =========================
+   Base
+   ========================= */
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01" 1, "ss02" 1;
+}
+
+/* Utility-ish helpers (no @apply) */
+.shadow-soft {
+  box-shadow: 0 8px 24px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.03) inset;
+}
+
+.muted { color: var(--ink-dim); }
+
+/* =========================
+   Layout shells
+   ========================= */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+/* =========================
+   Typography bits
+   ========================= */
+.title {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: .2px;
+  margin-bottom: 10px;
+}
+
+.lbl {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-dim);
+  letter-spacing: .25px;
+}
+
+.hint {
+  color: var(--ink-dim);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* =========================
+   Form controls
+   ========================= */
+.inp, .inp[type="number"], .inp[type="text"], select.inp {
+  width: 100%;
+  background: #0f1114;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.inp:focus,
+select.inp:focus {
+  border-color: var(--azure);
+  box-shadow: 0 0 0 3px rgba(4,225,249,.15);
+}
+
+/* Pills for currency etc. */
+.pill {
+  background: var(--chip);
+  color: #fff;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  transition: transform .04s ease, background .15s ease, border-color .15s ease;
+}
+.pill:hover { border-color: var(--azure); }
+.pill--active { background: var(--azure); color: #000; border-color: transparent; }
+
+/* Buttons */
+.btn {
+  background: var(--azure);
+  color: #000;
+  font-weight: 800;
+  padding: 10px 14px;
+  border-radius: 10px;
+  transition: transform .04s ease, box-shadow .15s ease;
+}
+.btn:hover { box-shadow: 0 0 0 3px rgba(4,225,249,.2); }
+.btn:active { transform: translateY(1px); }
+
+.btn-ghost {
+  color: var(--ink);
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+.btn-ghost:hover { border-color: var(--azure); }
+
+/* Range (slider) */
+.range-slim {
+  width: 100%;
+  height: 4px;
+  background: #1b1f25;
+  border-radius: 999px;
+  outline: none;
+  appearance: none;
+}
+
+/* WebKit */
+.range-slim::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(90deg, var(--azure), var(--azure));
+  border-radius: 999px;
+}
+.range-slim::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--azure);
+  border-radius: 50%;
+  margin-top: -7px; /* centers on 4px track */
+  border: 2px solid #0b0b0b;
+  box-shadow: 0 0 0 2px rgba(4,225,249,.25);
+}
+
+/* Firefox */
+.range-slim::-moz-range-track {
+  height: 4px;
+  background: var(--azure);
+  border-radius: 999px;
+}
+.range-slim::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--azure);
+  border-radius: 50%;
+  border: 2px solid #0b0b0b;
+  box-shadow: 0 0 0 2px rgba(4,225,249,.25);
+}
+
+/* =========================
+   KPIs
+   ========================= */
+.kpi {
+  background: #0f1114;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.kpi--accent {
+  box-shadow: 0 0 0 1px rgba(4,225,249,.25) inset;
+}
+.kpi__label {
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-weight: 700;
+}
+.kpi__value {
+  font-size: 22px;
+  font-weight: 900;
+  margin-top: 4px;
+}
+
+/* =========================
+   Progress chips
+   ========================= */
+.step-chip {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.step-chip--on {
+  background: var(--azure);
+  color: #000;
+}
+.step-chip--off {
+  background: #1b1f25;
+  color: var(--ink-dim);
+  border: 1px solid var(--border);
+}
+.step-label {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* =========================
+   Priority tiles
+   ========================= */
+.priority {
+  background: #121418;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: box-shadow .15s ease, outline-color .15s ease, transform .04s ease;
+}
+.priority:hover { border-color: var(--azure); }
+.priority:active { transform: translateY(1px); }
+.priority--active {
+  outline: 2px solid var(--azure);
+  outline-offset: 0;
+}
+
+/* =========================
+   Hero image
+   ========================= */
+.hero-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 16px;
+  object-fit: cover;  /* ensures no distortion if a fixed height is set later */
+}
+
+/* =========================
+   Tables (results list)
+   ========================= */
+.table-header {
+  display: grid;
+  grid-template-columns: 1fr 180px 200px;
+  gap: 0;
+  padding: 12px 16px;
+  background: #101317;
+  color: var(--ink-dim);
+  font-size: 12px;
+  font-weight: 700;
+}
+.table-row {
+  display: grid;
+  grid-template-columns: 1fr 180px 200px;
+  gap: 0;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+.table-row.total {
+  background: #0f1216;
+  border-top-color: var(--border-strong);
+  font-weight: 800;
+}
+
+/* =========================
+   Links reset (optional)
+   ========================= */
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; }
