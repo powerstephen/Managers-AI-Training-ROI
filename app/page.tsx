@@ -27,12 +27,7 @@ type WizardStep =
   | "team"
   | "adoption"
   | "priorities"
-  | "throughput"
-  | "quality"
-  | "onboarding"
-  | "retention"
-  | "upskilling"
-  | "costAvoidance"
+  | PriorityKey
   | "results";
 
 const PRIORITY_META: Record<
@@ -70,7 +65,7 @@ const PRIORITY_META: Record<
 
 const AZURE = "#00D7FF";
 
-/* ---------- Small UI helpers ---------- */
+/* ---------- Small UI helper ---------- */
 function Pill({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div
@@ -146,7 +141,6 @@ export default function Page() {
     "upskilling",
     "costAvoidance",
   ];
-
   const [selected, setSelected] = useState<PriorityKey[]>(
     allPriorityKeys.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 3)
   );
@@ -168,15 +162,40 @@ export default function Page() {
   }, [selected]);
 
   /* Priority inputs for the three configurable ones */
-  // Throughput
+  // Throughput + aggression
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
-  // Retention
+  const [throughputAgg, setThroughputAgg] = useState<"low" | "avg" | "high">("avg");
+  // Retention + aggression
   const [retentionLiftPct, setRetentionLiftPct] = useState(2);
   const [baselineAttritionPct, setBaselineAttritionPct] = useState(12);
-  // Upskilling
+  const [retentionAgg, setRetentionAgg] = useState<"low" | "avg" | "high">("avg");
+  // Upskilling + aggression
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(1.5);
+  const [upskillingAgg, setUpskillingAgg] = useState<"low" | "avg" | "high">("avg");
+
+  /* Aggression preset handler */
+  const applyAgg = (k: PriorityKey, level: "low" | "avg" | "high") => {
+    if (k === "throughput") {
+      setThroughputAgg(level);
+      if (level === "low") { setThroughputPct(4); setHandoffPct(3); }
+      if (level === "avg") { setThroughputPct(8); setHandoffPct(6); }
+      if (level === "high") { setThroughputPct(12); setHandoffPct(10); }
+    }
+    if (k === "retention") {
+      setRetentionAgg(level);
+      if (level === "low") { setRetentionLiftPct(1); setBaselineAttritionPct(10); }
+      if (level === "avg") { setRetentionLiftPct(2); setBaselineAttritionPct(12); }
+      if (level === "high") { setRetentionLiftPct(3); setBaselineAttritionPct(15); }
+    }
+    if (k === "upskilling") {
+      setUpskillingAgg(level);
+      if (level === "low") { setUpskillCoveragePct(40); setUpskillHoursPerWeek(1); }
+      if (level === "avg") { setUpskillCoveragePct(60); setUpskillHoursPerWeek(1.5); }
+      if (level === "high") { setUpskillCoveragePct(80); setUpskillHoursPerWeek(2); }
+    }
+  };
 
   /* Hours model */
   const baseWeeklyTeamHours = useMemo(
@@ -245,7 +264,6 @@ export default function Page() {
     const idx = ALL_STEPS.findIndex((s) => s.key === stepKey);
     if (idx > 0) setStepKey(ALL_STEPS[idx - 1].key);
   };
-
   const CONTINUE = () => {
     const idx = ALL_STEPS.findIndex((s) => s.key === stepKey);
     if (idx >= 0 && idx < ALL_STEPS.length - 1) setStepKey(ALL_STEPS[idx + 1].key);
@@ -269,19 +287,13 @@ export default function Page() {
           box-shadow: 0 0 12px ${AZURE}, 0 0 4px ${AZURE} inset;
           transition: width 150ms ease;
         }
-        /* Range exactly on the rail so the thumb sits centered */
+        /* Slider: thumb sits centered on the rail */
         .range-wrap { position: relative; height: 10px; }
         input.range-slim {
           -webkit-appearance: none;
           appearance: none;
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 10px; /* match rail */
-          background: transparent;
-          margin: 0;
-          padding: 0;
+          position: absolute; top: 0; left: 0; right: 0;
+          height: 10px; background: transparent; margin: 0; padding: 0;
         }
         input.range-slim::-webkit-slider-runnable-track { height: 10px; background: transparent; }
         input.range-slim::-moz-range-track { height: 10px; background: transparent; }
@@ -289,22 +301,33 @@ export default function Page() {
           -webkit-appearance: none;
           width: 18px; height: 18px; border-radius: 50%;
           background: ${AZURE}; border: 2px solid #000; box-shadow: 0 0 12px ${AZURE};
-          margin-top: -4px; /* centers thumb on 10px rail */
+          margin-top: -4px; /* centers on 10px rail */
         }
         input.range-slim::-moz-range-thumb {
           width: 18px; height: 18px; border-radius: 50%;
           background: ${AZURE}; border: 2px solid #000; box-shadow: 0 0 12px ${AZURE};
         }
-
-        /* Results grid: 4 x 2 (responsive down to 2 x 4) */
-        .results-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-        @media (max-width: 1024px) {
-          .results-grid { grid-template-columns: repeat(2, 1fr); }
+        /* Aggression pills */
+        .agg-row { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+        .agg-box {
+          padding: 8px 14px; border-radius: 9999px; background: #1a1a1a; border: 1px solid #333;
+          text-align: center; width: 110px;
         }
+        .agg-title { font-weight: 600; font-size: 0.9rem; }
+        .agg-sub { opacity: 0.8; font-size: 0.75rem; }
+        .agg-box--on { background: ${AZURE}; color: #000; border-color: ${AZURE}; }
+        /* Results grid: 4 x 2 (responsive to 2 x 4) */
+        .results-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        @media (max-width: 1024px) { .results-grid { grid-template-columns: repeat(2, 1fr); } }
       `}</style>
 
-      {/* Progress header */}
+      {/* HERO (image from /public/hero.png) */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
+        <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft" />
+      </div>
+
+      {/* Progress header */}
+      <div className="w-full max-w-6xl mx-auto px-4 mt-4">
         <div className="panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-4">
@@ -446,11 +469,12 @@ export default function Page() {
             </div>
           )}
 
-          {/* PRIORITY DETAIL SCREENS */}
+          {/* PRIORITY DETAIL — THROUGHPUT */}
           {stepKey === "throughput" && selected.includes("throughput") && (
             <div>
               <h2 className="title">Throughput</h2>
-              <p className="muted text-sm mb-4">Quick edit of assumptions for throughput impact.</p>
+              <p className="muted text-sm mb-4">Adjust assumptions for cycle time + handoff reduction.</p>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
                   <label className="lbl">Time reclaimed %</label>
@@ -461,6 +485,20 @@ export default function Page() {
                   <input className="inp" type="number" min={0} max={30} value={handoffPct} onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))} />
                 </div>
               </div>
+
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button key={o.k} className={`agg-box ${throughputAgg === (o.k as any) ? "agg-box--on" : ""}`} onClick={() => applyAgg("throughput", o.k as any)}>
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
+              </div>
+
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
@@ -468,9 +506,11 @@ export default function Page() {
             </div>
           )}
 
+          {/* PRIORITY DETAIL — RETENTION */}
           {stepKey === "retention" && selected.includes("retention") && (
             <div>
               <h2 className="title">Retention</h2>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
                   <label className="lbl">Attrition avoided %</label>
@@ -481,6 +521,20 @@ export default function Page() {
                   <input className="inp" type="number" min={0} max={40} value={baselineAttritionPct} onChange={(e) => setBaselineAttritionPct(parseInt(e.target.value || "0", 10))} />
                 </div>
               </div>
+
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button key={o.k} className={`agg-box ${retentionAgg === (o.k as any) ? "agg-box--on" : ""}`} onClick={() => applyAgg("retention", o.k as any)}>
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
+              </div>
+
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
@@ -488,9 +542,11 @@ export default function Page() {
             </div>
           )}
 
+          {/* PRIORITY DETAIL — UPSKILLING */}
           {stepKey === "upskilling" && selected.includes("upskilling") && (
             <div>
               <h2 className="title">Upskilling</h2>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
                   <label className="lbl">Coverage target %</label>
@@ -501,6 +557,20 @@ export default function Page() {
                   <input className="inp" type="number" min={0} step={0.1} value={upskillHoursPerWeek} onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))} />
                 </div>
               </div>
+
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button key={o.k} className={`agg-box ${upskillingAgg === (o.k as any) ? "agg-box--on" : ""}`} onClick={() => applyAgg("upskilling", o.k as any)}>
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
+              </div>
+
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
@@ -508,13 +578,13 @@ export default function Page() {
             </div>
           )}
 
-          {/* Lightweight screens for non-config priorities */}
+          {/* Lightweight info screens for simple priorities (still included so no steps are skipped) */}
           {stepKey === "quality" && selected.includes("quality") && (
             <div>
               <h2 className="title">Quality</h2>
               <p className="muted text-sm mb-4">{PRIORITY_META.quality.blurb}</p>
               <div className="card">
-                <div className="text-sm muted">No extra inputs needed — quality uplift is baked into the model.</div>
+                <div className="text-sm muted">No extra inputs needed — a conservative baseline is included in the model.</div>
               </div>
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
