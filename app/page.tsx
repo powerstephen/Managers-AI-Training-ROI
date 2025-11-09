@@ -64,7 +64,7 @@ const PRIORITY_META: Record<
   },
 };
 
-/* Wizard steps key (replaces any old StepKey) */
+/* Wizard steps */
 type WizardStep =
   | "team"
   | "adoption"
@@ -97,14 +97,14 @@ const maturityExplainer = [
 function perSeatPriceUSD(seats: number) {
   if (seats >= 1000) return 299;
   if (seats >= 100) return 349;
-  return 399; // 5–99 (and default)
+  return 399; // treat <5 as 399 too
 }
 
 /* Currency conversion for training price — simple static multipliers */
 function convertFromUSD(amount: number, ccy: Currency) {
   switch (ccy) {
     case "EUR":
-      return amount * 0.92; // rough factor
+      return amount * 0.92;
     case "GBP":
       return amount * 0.78;
     case "AUD":
@@ -120,53 +120,37 @@ function convertFromUSD(amount: number, ccy: Currency) {
    ========================= */
 
 export default function Page() {
-  /* ---- Step system ------------------------------------------------------ */
+  /* ---- Step system ------------------------------------ */
   const [step, setStep] = useState<WizardStep>("team");
-  const next = () => {
-    const order: WizardStep[] = [
-      "team",
-      "adoption",
-      "priorities",
-      "throughput",
-      "retention",
-      "upskilling",
-      "results",
-    ];
-    const i = order.indexOf(step);
-    setStep(order[Math.min(order.length - 1, i + 1)]);
-  };
-  const back = () => {
-    const order: WizardStep[] = [
-      "team",
-      "adoption",
-      "priorities",
-      "throughput",
-      "retention",
-      "upskilling",
-      "results",
-    ];
-    const i = order.indexOf(step);
-    setStep(order[Math.max(0, i - 1)]);
-  };
+  const order: WizardStep[] = [
+    "team",
+    "adoption",
+    "priorities",
+    "throughput",
+    "retention",
+    "upskilling",
+    "results",
+  ];
+  const next = () => setStep(order[Math.min(order.length - 1, order.indexOf(step) + 1)]);
+  const back = () => setStep(order[Math.max(0, order.indexOf(step) - 1)]);
   const reset = () => window.location.reload();
 
-  /* ---- Step 1: Team ----------------------------------------------------- */
+  /* ---- Step 1: Team ----------------------------------- */
   const [dept, setDept] = useState<Dept>("Company-wide");
   const [headcount, setHeadcount] = useState(150);
   const [currency, setCurrency] = useState<Currency>("EUR");
   const [avgSalary, setAvgSalary] = useState(52000);
   const [programMonths, setProgramMonths] = useState(3);
 
-  /* training cost (per-seat × seats), currency-adjusted */
-  const perSeatBaseUSD = perSeatPriceUSD(headcount);
-  const perSeatInCcy = convertFromUSD(perSeatBaseUSD, currency);
-  const trainingPerEmployee = perSeatInCcy;
-  const programCost = headcount * trainingPerEmployee;
+  // Live per-seat pricing from headcount & currency
+  const perSeatUSD = useMemo(() => perSeatPriceUSD(headcount), [headcount]);
+  const perSeatLocal = useMemo(() => convertFromUSD(perSeatUSD, currency), [perSeatUSD, currency]);
+  const programCost = useMemo(() => headcount * perSeatLocal, [headcount, perSeatLocal]);
 
-  /* ---- Step 2: AI Adoption --------------------------------------------- */
+  /* ---- Step 2: AI Adoption ---------------------------- */
   const [maturity, setMaturity] = useState(5);
 
-  /* ---- Step 3: Priorities (choose up to 3) ------------------------------ */
+  /* ---- Step 3: Priorities (up to 3) ------------------- */
   const keys: PriorityKey[] = [
     "throughput",
     "quality",
@@ -179,18 +163,13 @@ export default function Page() {
     keys.filter((k) => PRIORITY_META[k].defaultOn)
   );
 
-  /* Enforce max 3 selections */
   const togglePriority = (k: PriorityKey) => {
     const active = selected.includes(k);
-    if (active) {
-      setSelected(selected.filter((x) => x !== k));
-    } else {
-      if (selected.length >= 3) return; // do nothing if already 3
-      setSelected([...selected, k]);
-    }
+    if (active) setSelected(selected.filter((x) => x !== k));
+    else if (selected.length < 3) setSelected([...selected, k]);
   };
 
-  /* ---- Step 4–6 config -------------------------------------------------- */
+  /* ---- Step 4–6 config ------------------------------- */
   // Throughput
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
@@ -201,51 +180,40 @@ export default function Page() {
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
 
-  /* ---- Core calcs ------------------------------------------------------- */
+  /* ---- Core calcs ------------------------------------ */
   const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
-  const maturityHoursPerPerson = useMemo(
-    () => maturityToHours(maturity),
-    [maturity]
-  );
+  const maturityHoursPerPerson = useMemo(() => maturityToHours(maturity), [maturity]);
   const baseWeeklyTeamHours = useMemo(
     () => maturityHoursPerPerson * headcount,
     [maturityHoursPerPerson, headcount]
   );
 
-  /* More conservative onboarding math (only if chosen) */
+  // Conservative onboarding hours
   const onboardingWeeklyHours = useMemo(() => {
     if (!selected.includes("onboarding")) return 0;
-    // Previously huge; now narrower:
-    // assume average 10 new hires (or 8% of team) onboarding at any time, save 4h/wk each
-    const newHireShare = Math.max(0.05, Math.min(0.15, headcount * 0.0008)); // 8% bounded 5–15%
+    const newHireShare = Math.max(0.05, Math.min(0.15, headcount * 0.0008));
     const activeNewHires = Math.round(headcount * newHireShare);
-    const perHireHours = 4; // hours saved / week per active new hire
+    const perHireHours = 4;
     return activeNewHires * perHireHours;
   }, [selected, headcount]);
 
   const weeklyHours = useMemo(() => {
     const v: Record<PriorityKey, number> = {
       throughput: selected.includes("throughput")
-        ? Math.round(
-            baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100)
-          )
+        ? Math.round(baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100))
         : 0,
       quality: selected.includes("quality")
-        ? Math.round(baseWeeklyTeamHours * 0.06) // 6% not 20%
+        ? Math.round(baseWeeklyTeamHours * 0.06)
         : 0,
-      onboarding: onboardingWeeklyHours, // conservative calc above
+      onboarding: onboardingWeeklyHours,
       retention: selected.includes("retention")
-        ? Math.round(
-            ((headcount * (baselineAttritionPct / 100)) *
-              (retentionLiftPct / 100) *
-              60) / 52
-          ) // ~half a week reclaimed per avoided backfill, smoothed
+        ? Math.round(((headcount * (baselineAttritionPct / 100)) * (retentionLiftPct / 100) * 60) / 52)
         : 0,
       upskilling: selected.includes("upskilling")
         ? Math.round((upskillCoveragePct / 100) * headcount * upskillHoursPerWeek)
         : 0,
       costAvoidance: selected.includes("costAvoidance")
-        ? Math.round(baseWeeklyTeamHours * 0.04) // 4%
+        ? Math.round(baseWeeklyTeamHours * 0.04)
         : 0,
     };
     return v;
@@ -266,10 +234,7 @@ export default function Page() {
     () => Object.values(weeklyHours).reduce((a, b) => a + b, 0),
     [weeklyHours]
   );
-  const monthlyValue = useMemo(
-    () => weeklyTotal * hourlyCost * 4,
-    [weeklyTotal, hourlyCost]
-  );
+  const monthlyValue = useMemo(() => weeklyTotal * hourlyCost * 4, [weeklyTotal, hourlyCost]);
   const annualValue = useMemo(() => monthlyValue * 12, [monthlyValue]);
   const annualROI = useMemo(
     () => (programCost === 0 ? 0 : annualValue / programCost),
@@ -282,7 +247,7 @@ export default function Page() {
 
   const symbol = CURRENCY_SYMBOL[currency];
 
-  /* Ordered steps for the progress bar */
+  /* Steps (for progress bar) */
   const steps: { id: number; key: WizardStep; label: string }[] = [
     { id: 1, key: "team", label: "Team" },
     { id: 2, key: "adoption", label: "AI Adoption" },
@@ -309,14 +274,17 @@ export default function Page() {
           <div className="flex gap-4 flex-wrap">
             {steps.map((s) => (
               <div key={s.id} className="flex items-center gap-2">
-                <span className={`step-chip ${steps.findIndex((x) => x.key === step) + 1 >= s.id ? "step-chip--on" : "step-chip--off"}`}>
+                <span
+                  className={`step-chip ${
+                    steps.findIndex((x) => x.key === step) + 1 >= s.id ? "step-chip--on" : "step-chip--off"
+                  }`}
+                >
                   {s.id}
                 </span>
                 <span className="step-label">{s.label}</span>
               </div>
             ))}
           </div>
-          {/* Right-aligned live summary of chosen priorities */}
           <div className="text-xs muted">
             {selected.length > 0
               ? `Selected: ${selected.map((k) => PRIORITY_META[k].label).join(", ")}`
@@ -346,15 +314,25 @@ export default function Page() {
 
                 <div className="card">
                   <label className="lbl">Employees in scope</label>
-                  <input className="inp" type="number" value={headcount}
-                         onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    value={headcount}
+                    onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))}
+                  />
                 </div>
 
                 <div className="card">
                   <label className="lbl">Currency</label>
                   <div className="flex gap-2 flex-wrap">
                     {(["EUR","USD","GBP","AUD"] as Currency[]).map((c) => (
-                      <button key={c} onClick={() => setCurrency(c)} className={`pill ${currency === c ? "pill--active" : ""}`}>{c}</button>
+                      <button
+                        key={c}
+                        onClick={() => setCurrency(c)}
+                        className={`pill ${currency === c ? "pill--active" : ""}`}
+                      >
+                        {c}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -364,19 +342,26 @@ export default function Page() {
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="card">
                   <label className="lbl">Avg. annual salary ({symbol})</label>
-                  <input className="inp" type="number" value={avgSalary}
-                         onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    value={avgSalary}
+                    onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))}
+                  />
                 </div>
                 <div className="card">
                   <label className="lbl">Per-seat training ({symbol})</label>
-                  <input className="inp" type="number" value={Math.round(trainingPerEmployee)}
-                         onChange={() => { /* derived from headcount/currency; locked */ }} readOnly />
-                  <div className="hint">Tiered: $399 (5–99), $349 (100–999), $299 (1000+), converted to {currency}.</div>
+                  <input className="inp" type="number" value={Math.round(perSeatLocal)} readOnly />
+                  {/* Intentionally just the price as requested */}
                 </div>
                 <div className="card">
                   <label className="lbl">Program duration (months)</label>
-                  <input className="inp" type="number" value={programMonths}
-                         onChange={(e) => setProgramMonths(parseInt(e.target.value || "0", 10))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    value={programMonths}
+                    onChange={(e) => setProgramMonths(parseInt(e.target.value || "0", 10))}
+                  />
                 </div>
               </div>
 
@@ -452,12 +437,18 @@ export default function Page() {
                   return (
                     <div
                       key={k}
-                      className={`priority ${active ? "priority--active" : ""} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                      className={`priority ${active ? "priority--active" : ""} ${
+                        disabled ? "opacity-40 cursor-not-allowed" : ""
+                      }`}
                       onClick={() => togglePriority(k)}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-semibold">{PRIORITY_META[k].label}</span>
-                        <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${active ? "bg-[var(--bg-chip)] text-white" : "bg-[#22252c] text-white"}`}>
+                        <span
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+                            active ? "bg-[var(--bg-chip)] text-white" : "bg-[#22252c] text-white"
+                          }`}
+                        >
                           {active ? "Selected" : "Select"}
                         </span>
                       </div>
@@ -484,13 +475,25 @@ export default function Page() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
                   <label className="lbl">Time reclaimed %</label>
-                  <input className="inp" type="number" min={0} max={30} value={throughputPct}
-                         onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={throughputPct}
+                    onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))}
+                  />
                 </div>
                 <div className="card">
                   <label className="lbl">Handoffs reduced %</label>
-                  <input className="inp" type="number" min={0} max={30} value={handoffPct}
-                         onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={handoffPct}
+                    onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))}
+                  />
                 </div>
               </div>
 
@@ -508,13 +511,25 @@ export default function Page() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
                   <label className="lbl">Attrition avoided %</label>
-                  <input className="inp" type="number" min={0} max={30} value={retentionLiftPct}
-                         onChange={(e) => setRetentionLiftPct(parseInt(e.target.value || "0", 10))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={retentionLiftPct}
+                    onChange={(e) => setRetentionLiftPct(parseInt(e.target.value || "0", 10))}
+                  />
                 </div>
                 <div className="card">
                   <label className="lbl">Baseline attrition %</label>
-                  <input className="inp" type="number" min={0} max={40} value={baselineAttritionPct}
-                         onChange={(e) => setBaselineAttritionPct(parseInt(e.target.value || "0", 10))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={40}
+                    value={baselineAttritionPct}
+                    onChange={(e) => setBaselineAttritionPct(parseInt(e.target.value || "0", 10))}
+                  />
                 </div>
               </div>
 
@@ -532,13 +547,25 @@ export default function Page() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
                   <label className="lbl">Coverage target %</label>
-                  <input className="inp" type="number" min={0} max={100} value={upskillCoveragePct}
-                         onChange={(e) => setUpskillCoveragePct(parseInt(e.target.value || "0", 10))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={upskillCoveragePct}
+                    onChange={(e) => setUpskillCoveragePct(parseInt(e.target.value || "0", 10))}
+                  />
                 </div>
                 <div className="card">
                   <label className="lbl">Hours / week per person</label>
-                  <input className="inp" type="number" min={0} step={0.1} value={upskillHoursPerWeek}
-                         onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))} />
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={upskillHoursPerWeek}
+                    onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))}
+                  />
                 </div>
               </div>
 
@@ -555,44 +582,72 @@ export default function Page() {
               <h2 className="title">Results</h2>
 
               <div className="grid md:grid-cols-4 gap-4">
-                <div className="kpi kpi--accent"><div className="kpi__label">Total annual value</div><div className="kpi__value">{symbol}{Math.round(annualValue).toLocaleString()}</div></div>
-                <div className="kpi kpi--accent"><div className="kpi__label">Annual ROI</div><div className="kpi__value">{annualROI.toFixed(1)}×</div></div>
-                <div className="kpi kpi--accent"><div className="kpi__label">Payback</div><div className="kpi__value">{isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} mo` : "—"}</div></div>
-                <div className="kpi kpi--accent"><div className="kpi__label">Total hours saved (est.)</div><div className="kpi__value">{(weeklyTotal * 52).toLocaleString()}</div></div>
+                <div className="kpi kpi--accent">
+                  <div className="kpi__label">Total annual value</div>
+                  <div className="kpi__value">
+                    {symbol}
+                    {Math.round(annualValue).toLocaleString()}
+                  </div>
+                </div>
+                <div className="kpi kpi--accent">
+                  <div className="kpi__label">Annual ROI</div>
+                  <div className="kpi__value">{annualROI.toFixed(1)}×</div>
+                </div>
+                <div className="kpi kpi--accent">
+                  <div className="kpi__label">Payback</div>
+                  <div className="kpi__value">
+                    {isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} mo` : "—"}
+                  </div>
+                </div>
+                <div className="kpi kpi--accent">
+                  <div className="kpi__label">Total hours saved (est.)</div>
+                  <div className="kpi__value">{(weeklyTotal * 52).toLocaleString()}</div>
+                </div>
               </div>
 
               <div className="mt-6 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
-                <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold" style={{ color: "var(--text-dim)", background: "#101317" }}>
-                  <div>PRIORITY</div><div className="text-right">HOURS SAVED</div><div className="text-right">ANNUAL VALUE</div>
+                <div
+                  className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold"
+                  style={{ color: "var(--text-dim)", background: "#101317" }}
+                >
+                  <div>PRIORITY</div>
+                  <div className="text-right">HOURS SAVED</div>
+                  <div className="text-right">ANNUAL VALUE</div>
                 </div>
-                {keys.filter((k) => selected.includes(k)).map((k) => {
-                  const hours = Math.round(weeklyHours[k] * 52);
-                  const value = hours * hourlyCost;
-                  return (
-                    <div key={k} className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t" style={{ borderColor: "var(--border)" }}>
-                      <div>
-                        <div className="font-bold">{PRIORITY_META[k].label}</div>
-                        <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
+                {keys
+                  .filter((k) => selected.includes(k))
+                  .map((k) => {
+                    const hours = Math.round(weeklyHours[k] * 52);
+                    const value = hours * hourlyCost;
+                    return (
+                      <div
+                        key={k}
+                        className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t"
+                        style={{ borderColor: "var(--border)" }}
+                      >
+                        <div>
+                          <div className="font-bold">{PRIORITY_META[k].label}</div>
+                          <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
+                        </div>
+                        <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
+                        <div className="text-right font-semibold">
+                          {symbol}
+                          {Math.round(value).toLocaleString()}
+                        </div>
                       </div>
-                      <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
-                      <div className="text-right font-semibold">{symbol}{Math.round(value).toLocaleString()}</div>
-                    </div>
-                  );
-                })}
-                <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t" style={{ borderColor: "var(--border-strong)", background: "#0f1216" }}>
+                    );
+                  })}
+                <div
+                  className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 border-t"
+                  style={{ borderColor: "var(--border-strong)", background: "#0f1216" }}
+                >
                   <div className="font-extrabold">Total</div>
                   <div className="text-right font-extrabold">{(weeklyTotal * 52).toLocaleString()} h</div>
-                  <div className="text-right font-extrabold">{symbol}{Math.round(annualValue).toLocaleString()}</div>
+                  <div className="text-right font-extrabold">
+                    {symbol}
+                    {Math.round(annualValue).toLocaleString()}
+                  </div>
                 </div>
-              </div>
-
-              <div className="card mt-6">
-                <div className="text-sm font-bold mb-2">Next steps</div>
-                <ul className="list-disc pl-5 space-y-1 text-sm muted">
-                  <li>Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.</li>
-                  <li>Launch “AI Champions” cohort; set quarterly ROI reviews; track usage to correlate with retention.</li>
-                  <li>Set competency coverage target to 60% and measure weekly AI-in-task usage.</li>
-                </ul>
               </div>
 
               <div className="mt-6 flex justify-between">
@@ -603,12 +658,6 @@ export default function Page() {
           )}
         </div>
       </div>
-
-      {/* Simple styles expected by globals.css:
-         - .panel, .card, .inp, .pill, .btn, .btn-ghost
-         - .step-chip(.--on/--off), .step-label
-         - .range-slim, .muted, .kpi(.--accent), .hero-img, .hint, etc.
-      */}
     </div>
   );
 }
