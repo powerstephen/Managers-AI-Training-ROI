@@ -1,299 +1,643 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+"use client";
 
-/* =========================
-   THEME TOKENS
-   ========================= */
-:root {
-  --bg-page: #0b0b0b;         /* page background (near-black) */
-  --bg-panel: #111214;        /* big panels */
-  --bg-card: #16181c;         /* inner cards/inputs */
-  --border: #24272e;          /* standard border */
-  --border-strong: #2f333b;   /* strong border */
-  --text: #f5f7fa;            /* main text */
-  --text-dim: #9aa3af;        /* secondary text */
-  --azure: #04e1f9;           /* vivid azure accent */
-}
+import { useMemo, useState } from "react";
 
-/* Basic reset */
-html, body, #__next {
-  height: 100%;
-}
-body {
-  background: var(--bg-page);
-  color: var(--text);
-  @apply antialiased;
-}
+/* ---------- Types & constants ---------- */
+type Currency = "EUR" | "USD" | "GBP" | "AUD";
+const CURRENCY_SYMBOL: Record<Currency, string> = { EUR: "€", USD: "$", GBP: "£", AUD: "A$" };
 
-a { color: inherit; text-decoration: none; }
+type Dept =
+  | "Company-wide"
+  | "Marketing"
+  | "Sales"
+  | "Customer Support"
+  | "Operations"
+  | "Engineering"
+  | "HR";
 
-/* =========================
-   LAYOUT CONTAINERS
-   ========================= */
-.panel {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 18px;
-}
+type PriorityKey = "throughput" | "quality" | "onboarding" | "retention" | "upskilling" | "costAvoidance";
 
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px;
-}
+const PRIORITY_META: Record<PriorityKey, { label: string; blurb: string; defaultOn?: boolean }> = {
+  throughput: { label: "Throughput", blurb: "Ship faster; reduce cycle time and waiting time.", defaultOn: true },
+  quality: { label: "Quality", blurb: "Fewer reworks; better first-pass yield.", defaultOn: true },
+  onboarding: { label: "Onboarding", blurb: "Ramp new hires faster with AI assist.", defaultOn: true },
+  retention: { label: "Retention", blurb: "Reduce regretted attrition via better tooling." },
+  upskilling: { label: "Upskilling", blurb: "Grow competency coverage; unlock compounding gains." },
+  costAvoidance: { label: "Cost avoidance", blurb: "Avoid outside spend/overtime via automation." },
+};
 
-.shadow-soft {
-  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-}
+/* Wizard steps key (no duplicate aliases anywhere) */
+type WizardStep =
+  | "team"
+  | "adoption"
+  | "priorities"
+  | "throughput"
+  | "retention"
+  | "upskilling"
+  | "results";
 
-.hero-img {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 16px;
-  object-fit: cover;          /* keep proportions */
-}
+const ALL_STEPS: { id: number; key: WizardStep; label: string }[] = [
+  { id: 1, key: "team", label: "Team" },
+  { id: 2, key: "adoption", label: "AI Adoption" },
+  { id: 3, key: "priorities", label: "Team Priorities" },
+  { id: 4, key: "throughput", label: "Throughput" },
+  { id: 5, key: "retention", label: "Retention" },
+  { id: 6, key: "upskilling", label: "Upskilling" },
+  { id: 7, key: "results", label: "Results" },
+];
 
-/* =========================
-   TYPOGRAPHY
-   ========================= */
-.title {
-  @apply text-2xl font-extrabold mb-4;
-}
+/* Adoption → weekly hours per employee */
+const maturityToHours = (lvl: number) => {
+  const map = [5, 4.5, 4, 3.5, 3, 2.6, 2.2, 1.8, 1.4, 1];
+  return map[Math.min(10, Math.max(1, lvl)) - 1];
+};
 
-.lbl {
-  @apply block text-sm font-semibold mb-2;
-  color: var(--text);
-}
+const maturityExplainer = [
+  "Early: ad-hoc experiments; big wins from prompt basics + workflow mapping.",
+  "Exploring: a few enthusiasts; scattered wins, limited reuse.",
+  "Emerging: managers aware; some templates in docs; no QA.",
+  "Forming: pilots in 1–2 teams; light process; inconsistent results.",
+  "Defined: prompt patterns exist; simple guardrails; visible wins.",
+  "Adopted: managers model usage; shared library; track time saved.",
+  "Integrated: AI in key SOPs; QA + rubrics; weekly sharing cadence.",
+  "Scaled: champions cohort; coverage 40–60%; measurable cycle gains.",
+  "Optimized: 60–80% coverage; golden paths; usage tied to KPIs.",
+  "Embedded: >80% coverage; evals/guardrails; continuous improvement.",
+];
 
-.hint, .muted {
-  color: var(--text-dim);
-}
+/* ---------- Component ---------- */
+export default function Page() {
+  /* Step and flow */
+  const [stepKey, setStepKey] = useState<WizardStep>("team");
+  const go = (key: WizardStep) => setStepKey(key);
+  const back = () => {
+    const order = currentLinearFlow();
+    const idx = order.indexOf(stepKey);
+    if (idx > 0) setStepKey(order[idx - 1]);
+  };
+  const reset = () => window.location.reload();
 
-/* =========================
-   INPUTS & CONTROLS
-   ========================= */
-.inp {
-  width: 100%;
-  background: var(--bg-card);
-  color: #fff;
-  font-weight: 700;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 12px;
-  outline: none;
-}
-.inp:focus {
-  border-color: var(--azure);
-  box-shadow: 0 0 0 3px rgba(4,225,249,0.15);
-}
+  /* Step 1: team basics */
+  const [dept, setDept] = useState<Dept>("Company-wide");
+  const [headcount, setHeadcount] = useState(150);
+  const [currency, setCurrency] = useState<Currency>("EUR");
+  const [avgSalary, setAvgSalary] = useState(52000);
 
-select.inp {
-  background-image: none;
-}
+  /* Price per seat: auto-tiers in USD → converted by symbol (simple display) */
+  const seatUSD = headcount >= 1000 ? 299 : headcount >= 100 ? 349 : 399;
+  // For display only, we'll show local symbol with same numeric (you asked for simple symbol switch):
+  const symbol = CURRENCY_SYMBOL[currency];
 
-/* currency pills */
-.pill {
-  background: #22252c;
-  color: #fff;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-weight: 700;
-}
-.pill--active {
-  border-color: var(--azure);
-  box-shadow: inset 0 0 0 1px var(--azure);
-  background: rgba(4,225,249,0.08);
-}
+  /* Derived costs */
+  const hourlyCost = useMemo(() => avgSalary / 52 / 40, [avgSalary]);
+  const programCost = useMemo(() => headcount * seatUSD, [headcount, seatUSD]); // your seat pricing
 
-/* buttons */
-.btn {
-  background: var(--azure);
-  color: #000;
-  font-weight: 800;
-  border-radius: 999px;
-  padding: 10px 16px;
-  border: none;
-  transition: transform 0.06s ease;
-}
-.btn:active { transform: translateY(1px); }
+  /* Step 2: adoption */
+  const [adoption, setAdoption] = useState(5); // 1..10
+  const maturityHoursPerPerson = useMemo(() => maturityToHours(adoption), [adoption]);
+  const maturityHoursTeam = useMemo(() => Math.round(maturityHoursPerPerson * headcount), [maturityHoursPerPerson, headcount]);
 
-.btn-ghost {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 10px 16px;
-  transition: border-color 0.2s ease;
-}
-.btn-ghost:hover {
-  border-color: var(--azure);
-}
+  /* Step 3: priorities */
+  const priorityOrder: PriorityKey[] = ["throughput", "retention", "upskilling"]; // the ones with config screens
+  const keys: PriorityKey[] = ["throughput", "quality", "onboarding", "retention", "upskilling", "costAvoidance"];
+  const [selected, setSelected] = useState<PriorityKey[]>(
+    keys.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 3)
+  );
 
-/* range (slim) */
-.range-slim {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: #1b1b1b;
-  outline: none;
-  border: 1px solid var(--border);
-}
-.range-slim::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: var(--azure);
-  border: 2px solid #0b0b0b;
-  cursor: pointer;
-  box-shadow: 0 0 0 2px rgba(4,225,249,0.2);
-}
-.range-slim::-moz-range-thumb {
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: var(--azure);
-  border: 2px solid #0b0b0b;
-  cursor: pointer;
-}
+  /* Step 4..6: per-priority inputs + aggressiveness */
+  // Throughput
+  const [throughputPct, setThroughputPct] = useState(8);
+  const [handoffPct, setHandoffPct] = useState(6);
+  const [throughputAgg, setThroughputAgg] = useState<"low" | "avg" | "high">("avg");
 
-/* progress (full width) */
-.progress-rail {
-  width: 100%;
-  height: 8px;
-  background: #1b1b1b;
-  border-radius: 999px;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-.progress-fill {
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 0%;
-  background: var(--azure);
-  transition: width 0.3s ease;
-}
+  // Retention
+  const [retentionLiftPct, setRetentionLiftPct] = useState(2);
+  const [baselineAttritionPct, setBaselineAttritionPct] = useState(12);
+  const [retentionAgg, setRetentionAgg] = useState<"low" | "avg" | "high">("avg");
 
-/* step chips */
-.step-chip {
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  font-weight: 800;
-  border: 1px solid var(--border);
-}
-.step-chip--off {
-  background: transparent;
-  color: var(--text-dim);
-}
-.step-chip--on {
-  background: var(--azure);
-  color: #000;
-  border-color: var(--azure);
-}
-.step-label {
-  font-weight: 800;
-  color: var(--text);
-}
+  // Upskilling
+  const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
+  const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
+  const [upskillingAgg, setUpskillingAgg] = useState<"low" | "avg" | "high">("avg");
 
-/* priority tiles */
-.priority {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  transition: 0.2s ease;
-}
-.priority--active {
-  border-color: var(--azure);
-  box-shadow: inset 0 0 0 1px var(--azure);
-  background: rgba(4,225,249,0.06);
-}
+  // Aggressiveness presets (apply when toggled)
+  const applyAgg = (k: PriorityKey, level: "low" | "avg" | "high") => {
+    if (k === "throughput") {
+      setThroughputAgg(level);
+      if (level === "low") { setThroughputPct(4); setHandoffPct(3); }
+      if (level === "avg") { setThroughputPct(8); setHandoffPct(6); }
+      if (level === "high") { setThroughputPct(12); setHandoffPct(10); }
+    }
+    if (k === "retention") {
+      setRetentionAgg(level);
+      if (level === "low") { setRetentionLiftPct(1); setBaselineAttritionPct(10); }
+      if (level === "avg") { setRetentionLiftPct(2); setBaselineAttritionPct(12); }
+      if (level === "high") { setRetentionLiftPct(3); setBaselineAttritionPct(15); }
+    }
+    if (k === "upskilling") {
+      setUpskillingAgg(level);
+      if (level === "low") { setUpskillCoveragePct(40); setUpskillHoursPerWeek(1); }
+      if (level === "avg") { setUpskillCoveragePct(60); setUpskillHoursPerWeek(1.5); }
+      if (level === "high") { setUpskillCoveragePct(80); setUpskillHoursPerWeek(2); }
+    }
+  };
 
-/* KPI boxes on results */
-.kpi {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px;
-}
-.kpi__label {
-  color: var(--text-dim);
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-.kpi__value {
-  font-size: 22px;
-  font-weight: 900;
-}
+  /* Hours model */
+  const baseWeeklyTeamHours = useMemo(() => maturityHoursPerPerson * headcount, [maturityHoursPerPerson, headcount]);
 
-/* =========================
-   AGG CHOOSER (Low/Avg/High)
-   ========================= */
-/* Small, inline boxes below input rows */
-.agg-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-}
-.agg-box {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px 10px;
-  text-align: center;
-  min-width: 92px;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-.agg-box--on {
-  border-color: var(--azure);
-  background: rgba(4,225,249,0.08);
-  box-shadow: inset 0 0 0 1px var(--azure);
-}
-.agg-title {
-  font-weight: 700;
-  font-size: 13px;
-  line-height: 1.1;
-}
-.agg-sub {
-  font-size: 11px;
-  color: var(--text-dim);
-  line-height: 1;
-  margin-top: 1px;
-}
+  const weeklyHours = useMemo(() => {
+    const v: Record<PriorityKey, number> = {
+      throughput: selected.includes("throughput")
+        ? Math.round(baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100))
+        : 0,
+      quality: selected.includes("quality")
+        ? Math.round(baseWeeklyTeamHours * 0.2)
+        : 0,
+      onboarding: selected.includes("onboarding")
+        ? Math.round(((2 * 40) * (headcount * 0.2))) // was too high before; keep modest
+        : 0,
+      retention: selected.includes("retention")
+        ? Math.round(((headcount * (baselineAttritionPct / 100)) * (retentionLiftPct / 100) * 120) / 52)
+        : 0,
+      upskilling: selected.includes("upskilling")
+        ? Math.round((upskillCoveragePct / 100) * headcount * Math.max(1, upskillHoursPerWeek)) // ensure min 1 hour
+        : 0,
+      costAvoidance: selected.includes("costAvoidance")
+        ? Math.round(baseWeeklyTeamHours * 0.05)
+        : 0,
+    };
+    return v;
+  }, [
+    selected,
+    baseWeeklyTeamHours,
+    throughputPct,
+    handoffPct,
+    headcount,
+    retentionLiftPct,
+    baselineAttritionPct,
+    upskillCoveragePct,
+    upskillHoursPerWeek,
+  ]);
 
-/* =========================
-   TABLE (Results list)
-   ========================= */
-.table-header {
-  color: var(--text-dim);
-  background: #101317;
-}
-.table-row {
-  border-top: 1px solid var(--border);
-}
-.table-total {
-  background: #0f1216;
-  border-top: 1px solid var(--border-strong);
-  font-weight: 800;
-}
+  const weeklyTotal = useMemo(() => Object.values(weeklyHours).reduce((a, b) => a + b, 0), [weeklyHours]);
+  const monthlyValue = useMemo(() => weeklyTotal * hourlyCost * 4, [weeklyTotal, hourlyCost]);
+  const annualValue = useMemo(() => monthlyValue * 12, [monthlyValue]);
+  const annualROI = useMemo(() => (programCost === 0 ? 0 : annualValue / programCost), [annualValue, programCost]);
+  const paybackMonths = useMemo(() => (monthlyValue === 0 ? Infinity : programCost / monthlyValue), [programCost, monthlyValue]);
 
-/* =========================
-   UTILITIES
-   ========================= */
-hr.sep {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 14px 0;
+  /* Flow helpers: compute the linear flow based on chosen priorities */
+  function currentLinearFlow(): WizardStep[] {
+    const base: WizardStep[] = ["team", "adoption", "priorities"];
+    const chosenConfigs: WizardStep[] = priorityOrder
+      .filter((k) => selected.includes(k))
+      .map((k) => k as WizardStep);
+    return [...base, ...chosenConfigs, "results"];
+  }
+
+  const CONTINUE = () => {
+    // enforce min 3 priorities before leaving priorities screen
+    if (stepKey === "priorities" && selected.length < 3) return;
+    const order = currentLinearFlow();
+    const idx = order.indexOf(stepKey);
+    if (idx >= 0 && idx < order.length - 1) setStepKey(order[idx + 1]);
+  };
+
+  /* ---------- UI ---------- */
+  const stepIndex = ALL_STEPS.find((s) => s.key === stepKey)?.id ?? 1;
+  const visibleProgress = ((stepIndex - 1) / (ALL_STEPS.length - 1)) * 100;
+
+  return (
+    <div className="min-h-screen" style={{ background: "var(--bg-page)", color: "var(--text)" }}>
+      {/* HERO */}
+      <div className="w-full max-w-6xl mx-auto px-4 pt-6">
+        <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft" />
+      </div>
+
+      {/* Progress */}
+      <div className="w-full max-w-6xl mx-auto px-4 mt-4">
+        <div className="panel">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-4 flex-wrap">
+              {ALL_STEPS.map((s) => (
+                <div key={s.id} className="flex items-center gap-2">
+                  <span className={`step-chip ${stepIndex >= s.id ? "step-chip--on" : "step-chip--off"}`}>{s.id}</span>
+                  <span className="step-label">{s.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="w-full mt-3">
+              <div className="progress-rail">
+                <div className="progress-fill" style={{ width: `${visibleProgress}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main card */}
+      <div className="w-full max-w-6xl mx-auto px-4 mt-4 pb-16">
+        <div className="panel">
+          {/* STEP: Team */}
+          {stepKey === "team" && (
+            <div>
+              <h2 className="title">Team</h2>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="card">
+                  <label className="lbl">Department</label>
+                  <select className="inp" value={dept} onChange={(e) => setDept(e.target.value as Dept)}>
+                    {["Company-wide", "Marketing", "Sales", "Customer Support", "Operations", "Engineering", "HR"].map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  <p className="hint">Choose a function or “Company-wide”.</p>
+                </div>
+
+                <div className="card">
+                  <label className="lbl">Employees in scope</label>
+                  <input className="inp" type="number" value={headcount} onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))} />
+                </div>
+
+                <div className="card">
+                  <label className="lbl">Currency</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {(["EUR", "USD", "GBP", "AUD"] as Currency[]).map((c) => (
+                      <button key={c} onClick={() => setCurrency(c)} className={`pill ${currency === c ? "pill--active" : ""}`}>{c}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* >> Price per seat / Program cost — bigger like before */}
+              <div className="grid md:grid-cols-3 gap-4 mt-6">
+                <div className="card">
+                  <label className="lbl text-base font-extrabold">Price per seat</label>
+                  <div className="text-2xl font-extrabold">
+                    {symbol}
+                    {seatUSD.toLocaleString()}
+                  </div>
+                </div>
+                <div className="card">
+                  <label className="lbl text-base font-extrabold">Estimated annual program cost</label>
+                  <div className="text-2xl font-extrabold">
+                    {symbol}
+                    {(seatUSD * headcount).toLocaleString()}
+                  </div>
+                </div>
+                <div className="card">
+                  <label className="lbl">Average annual salary</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    value={avgSalary}
+                    onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))}
+                  />
+                  <div className="hint text-xs mt-2">Used to value hours saved.</div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={() => go("adoption")}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP: AI Adoption */}
+          {stepKey === "adoption" && (
+            <div>
+              <h2 className="title">AI Adoption</h2>
+              <p className="muted text-sm mb-3">
+                Slide to estimate current AI-in-workflow adoption. Higher adoption = more weekly hours reclaimed.
+              </p>
+
+              <div className="grid md:grid-cols-[1fr_360px] gap-6">
+                <div className="card">
+                  {/* Azure-filled slider with markers 1..10 */}
+                  <label className="lbl mb-2">Where are you today? (1–10)</label>
+
+                  <div className="relative">
+                    <div className="progress-rail">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${((adoption - 1) / 9) * 100}%` }}
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      value={adoption}
+                      onChange={(e) => setAdoption(parseInt(e.target.value, 10))}
+                      className="w-full range-slim mt-2"
+                    />
+                  </div>
+
+                  <div className="flex justify-between mt-2 font-semibold" style={{ color: "var(--text-dim)", fontSize: "15px" }}>
+                    {Array.from({ length: 10 }).map((_, i) => <span key={i}>{i + 1}</span>)}
+                  </div>
+
+                  <div className="mt-4 text-[15px]">
+                    <span className="font-bold">Selected: {adoption} — </span>
+                    {maturityExplainer[adoption - 1]}
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="text-sm font-semibold muted">Estimated hours saved</div>
+                  <div className="grid grid-cols-2 gap-4 mt-3">
+                    <div className="card">
+                      <div className="text-xs muted">Per employee / week</div>
+                      <div className="text-3xl font-extrabold">{maturityHoursPerPerson.toFixed(1)}</div>
+                    </div>
+                    <div className="card">
+                      <div className="text-xs muted">Team / week</div>
+                      <div className="text-3xl font-extrabold">{maturityHoursTeam.toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-xs muted">Refine via priorities and training below.</div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={() => go("priorities")}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP: Priorities */}
+          {stepKey === "priorities" && (
+            <div>
+              <h2 className="title">Team Priorities</h2>
+              <p className="muted text-sm mb-4">Choose <b>exactly three</b> areas to focus your ROI model.</p>
+
+              <div className="grid md:grid-cols-3 gap-3">
+                {keys.map((k) => {
+                  const active = selected.includes(k);
+                  const disabled = !active && selected.length >= 3;
+                  return (
+                    <div key={k} className={`priority ${active ? "priority--active" : ""} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">{PRIORITY_META[k].label}</span>
+                        <button
+                          onClick={() => {
+                            if (active) setSelected(selected.filter((x) => x !== k));
+                            else if (!disabled) setSelected([...selected, k]);
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${active ? "bg-[var(--bg-chip)] text-white" : "bg-[#22252c] text-white"}`}
+                        >
+                          {active ? "Selected" : "Select"}
+                        </button>
+                      </div>
+                      <div className="text-sm muted mt-1">{PRIORITY_META[k].blurb}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={CONTINUE} disabled={selected.length !== 3}>
+                  Continue →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP: Throughput */}
+          {stepKey === "throughput" && selected.includes("throughput") && (
+            <div>
+              <h2 className="title">Throughput</h2>
+              <p className="muted text-sm mb-4">Quick edit of assumptions for throughput impact.</p>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="card">
+                  <label className="lbl">Time reclaimed %</label>
+                  <input className="inp" type="number" min={0} max={30} value={throughputPct} onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+                <div className="card">
+                  <label className="lbl">Handoffs reduced %</label>
+                  <input className="inp" type="number" min={0} max={30} value={handoffPct} onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+              </div>
+
+              {/* Agg row BELOW inputs */}
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button
+                    key={o.k}
+                    className={`agg-box ${throughputAgg === (o.k as any) ? "agg-box--on" : ""}`}
+                    onClick={() => applyAgg("throughput", o.k as any)}
+                  >
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    // move to next chosen config step else results
+                    const flow = currentLinearFlow();
+                    const after = nextChosenConfig("throughput");
+                    setStepKey(after ?? "results");
+                  }}
+                >
+                  Continue →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP: Retention */}
+          {stepKey === "retention" && selected.includes("retention") && (
+            <div>
+              <h2 className="title">Retention</h2>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="card">
+                  <label className="lbl">Attrition avoided %</label>
+                  <input className="inp" type="number" min={0} max={30} value={retentionLiftPct} onChange={(e) => setRetentionLiftPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+                <div className="card">
+                  <label className="lbl">Baseline attrition %</label>
+                  <input className="inp" type="number" min={0} max={40} value={baselineAttritionPct} onChange={(e) => setBaselineAttritionPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+              </div>
+
+              {/* Agg row BELOW inputs */}
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button
+                    key={o.k}
+                    className={`agg-box ${retentionAgg === (o.k as any) ? "agg-box--on" : ""}`}
+                    onClick={() => applyAgg("retention", o.k as any)}
+                  >
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    const after = nextChosenConfig("retention");
+                    setStepKey(after ?? "results");
+                  }}
+                >
+                  Continue →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP: Upskilling */}
+          {stepKey === "upskilling" && selected.includes("upskilling") && (
+            <div>
+              <h2 className="title">Upskilling</h2>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="card">
+                  <label className="lbl">Coverage target %</label>
+                  <input className="inp" type="number" min={0} max={100} value={upskillCoveragePct} onChange={(e) => setUpskillCoveragePct(parseInt(e.target.value || "0", 10))} />
+                </div>
+                <div className="card">
+                  <label className="lbl">Hours / week per person</label>
+                  <input className="inp" type="number" min={0} step={0.1} value={upskillHoursPerWeek} onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))} />
+                </div>
+              </div>
+
+              {/* Agg row BELOW inputs */}
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button
+                    key={o.k}
+                    className={`agg-box ${upskillingAgg === (o.k as any) ? "agg-box--on" : ""}`}
+                    onClick={() => applyAgg("upskilling", o.k as any)}
+                  >
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={() => go("results")}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP: Results */}
+          {stepKey === "results" && (
+            <div>
+              <h2 className="title">Results</h2>
+
+              <div className="grid md:grid-cols-4 gap-4">
+                <div className="kpi">
+                  <div className="kpi__label">Total annual value</div>
+                  <div className="kpi__value">
+                    {symbol}
+                    {Math.round(annualValue).toLocaleString()}
+                  </div>
+                </div>
+                <div className="kpi">
+                  <div className="kpi__label">Annual ROI</div>
+                  <div className="kpi__value">{annualROI.toFixed(1)}×</div>
+                </div>
+                <div className="kpi">
+                  <div className="kpi__label">Payback</div>
+                  <div className="kpi__value">{isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} mo` : "—"}</div>
+                </div>
+                <div className="kpi">
+                  <div className="kpi__label">Total hours saved (est.)</div>
+                  <div className="kpi__value">{(weeklyTotal * 52).toLocaleString()}</div>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+                <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold table-header">
+                  <div>PRIORITY</div>
+                  <div className="text-right">HOURS SAVED</div>
+                  <div className="text-right">ANNUAL VALUE</div>
+                </div>
+
+                {keys
+                  .filter((k) => selected.includes(k))
+                  .map((k) => {
+                    const hours = Math.round(weeklyHours[k] * 52);
+                    const value = hours * hourlyCost;
+                    return (
+                      <div key={k} className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-row">
+                        <div>
+                          <div className="font-bold">{PRIORITY_META[k].label}</div>
+                          <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
+                        </div>
+                        <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
+                        <div className="text-right font-semibold">
+                          {symbol}
+                          {Math.round(value).toLocaleString()}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-total">
+                  <div className="font-extrabold">Total</div>
+                  <div className="text-right font-extrabold">{(weeklyTotal * 52).toLocaleString()} h</div>
+                  <div className="text-right font-extrabold">
+                    {symbol}
+                    {Math.round(annualValue).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="card mt-6">
+                <div className="text-sm font-bold mb-2">Next steps</div>
+                <ul className="list-disc pl-5 space-y-1 text-sm muted">
+                  <li>Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.</li>
+                  <li>Launch “AI Champions” cohort; set quarterly ROI reviews; track usage to correlate with retention.</li>
+                  <li>Set competency coverage target to 60% and measure weekly AI-in-task usage.</li>
+                </ul>
+              </div>
+
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={reset}>Start over</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* move to the next chosen config after the given one */
+  function nextChosenConfig(current: "throughput" | "retention" | "upskilling"): WizardStep | null {
+    const order: PriorityKey[] = ["throughput", "retention", "upskilling"];
+    const idx = order.indexOf(current);
+    for (let i = idx + 1; i < order.length; i++) {
+      if (selected.includes(order[i])) return order[i] as WizardStep;
+    }
+    return null;
+  }
 }
