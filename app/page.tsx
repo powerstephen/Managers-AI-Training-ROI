@@ -38,17 +38,14 @@ const PRIORITY_META: Record<
   throughput: {
     label: "Throughput",
     blurb: "Ship faster; reduce cycle time and waiting time.",
-    defaultOn: true,
   },
   quality: {
     label: "Quality",
     blurb: "Fewer reworks; better first-pass yield.",
-    defaultOn: true,
   },
   onboarding: {
     label: "Onboarding",
     blurb: "Ramp new hires faster with AI assist.",
-    defaultOn: true,
   },
   retention: {
     label: "Retention",
@@ -86,15 +83,15 @@ const maturityExplainer = [
 
 export default function Page() {
   /* ---- Step system ------------------------------------------------------ */
-  type StepKey =
+  type WizardStep =
     | "team"
     | "adoption"
     | "priorities"
     | PriorityKey
     | "results";
 
-  const [step, setStep] = useState<StepKey>("team");
-  const go = (k: StepKey) => setStep(k);
+  const [step, setStep] = useState<WizardStep>("team");
+  const go = (k: WizardStep) => setStep(k);
 
   /* ---- Step 1 (Team) ---------------------------------------------------- */
   const [dept, setDept] = useState<Dept>("Company-wide");
@@ -116,9 +113,7 @@ export default function Page() {
     "upskilling",
     "costAvoidance",
   ];
-  const [selected, setSelected] = useState<PriorityKey[]>(
-    ALL_KEYS.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 0) // start empty; user must pick 3
-  );
+  const [selected, setSelected] = useState<PriorityKey[]>([]); // must pick 3
 
   /* ---- Steps 4–6 (Config) ---------------------------------------------- */
   const [throughputPct, setThroughputPct] = useState(8);
@@ -130,9 +125,7 @@ export default function Page() {
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(0.5);
 
-  /* ---- Scenario chips (Low / Avg / High) --------------------------------
-     These mutate the inputs for each priority in its config screen
-  ------------------------------------------------------------------------ */
+  /* ---- Scenario chips (Low / Avg / High) -------------------------------- */
 
   type Scenario = "low" | "avg" | "high";
   const vividAzure = "#04e1f9";
@@ -203,8 +196,7 @@ export default function Page() {
         ? Math.round(baseWeeklyTeamHours * 0.2)
         : 0,
       onboarding: selected.includes("onboarding")
-        ? // clamp onboarding to be realistic: assume 1 week saved per new hire,
-          // new hires ~= 20% of HC / year spread over 52 weeks
+        ? // realistic: ~20% HC new hires / year, save ~1 week (40h) each, spread weekly
           Math.round(((headcount * 0.2 * 40) / 52) * 1)
         : 0,
       retention: selected.includes("retention")
@@ -216,7 +208,9 @@ export default function Page() {
           )
         : 0,
       upskilling: selected.includes("upskilling")
-        ? Math.round((upskillCoveragePct / 100) * headcount * upskillHoursPerWeek)
+        ? Math.round(
+            (upskillCoveragePct / 100) * headcount * upskillHoursPerWeek
+          )
         : 0,
       costAvoidance: selected.includes("costAvoidance")
         ? Math.round(baseWeeklyTeamHours * 0.1)
@@ -261,7 +255,7 @@ export default function Page() {
 
   /* ---- Step sequence & progress ---------------------------------------- */
 
-  const chosenConfigSteps = useMemo<StepKey[]>(
+  const chosenConfigSteps = useMemo<WizardStep[]>(
     () =>
       (["throughput", "retention", "upskilling"] as PriorityKey[]).filter((k) =>
         selected.includes(k)
@@ -269,12 +263,12 @@ export default function Page() {
     [selected]
   );
 
-  const steps: StepKey[] = useMemo(
+  const steps: WizardStep[] = useMemo(
     () => ["team", "adoption", "priorities", ...chosenConfigSteps, "results"],
     [chosenConfigSteps]
   );
 
-  const stepLabel = (k: StepKey) =>
+  const stepLabel = (k: WizardStep) =>
     ({
       team: "Team",
       adoption: "AI Adoption",
@@ -307,11 +301,20 @@ export default function Page() {
 
   /* --------------------------------- UI ---------------------------------- */
 
+  const vividAzure = "#04e1f9";
+
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg-page)", color: "var(--text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--bg-page)", color: "var(--text)" }}
+    >
       {/* HERO */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
-        <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft" />
+        <img
+          src="/hero.png"
+          alt="AI at Work — Brainster"
+          className="hero-img shadow-soft"
+        />
       </div>
 
       {/* PROGRESS */}
@@ -323,7 +326,9 @@ export default function Page() {
             return (
               <div key={s} className="flex items-center gap-2">
                 <span
-                  className={`step-chip ${done || active ? "step-chip--on" : "step-chip--off"}`}
+                  className={`step-chip ${
+                    done || active ? "step-chip--on" : "step-chip--off"
+                  }`}
                 >
                   {i + 1}
                 </span>
@@ -373,7 +378,9 @@ export default function Page() {
                     className="inp"
                     type="number"
                     value={headcount}
-                    onChange={(e) => setHeadcount(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setHeadcount(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
 
@@ -384,7 +391,9 @@ export default function Page() {
                       <button
                         key={c}
                         onClick={() => setCurrency(c)}
-                        className={`pill ${currency === c ? "pill--active" : ""}`}
+                        className={`pill ${
+                          currency === c ? "pill--active" : ""
+                        }`}
                       >
                         {c}
                       </button>
@@ -393,25 +402,35 @@ export default function Page() {
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold mt-8 mb-2">Program cost assumptions</h3>
+              <h3 className="text-lg font-bold mt-8 mb-2">
+                Program cost assumptions
+              </h3>
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="card">
-                  <label className="lbl">Average annual salary ({symbol})</label>
+                  <label className="lbl">
+                    Average annual salary ({symbol})
+                  </label>
                   <input
                     className="inp"
                     type="number"
                     value={avgSalary}
-                    onChange={(e) => setAvgSalary(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setAvgSalary(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
                 <div className="card">
-                  <label className="lbl">Training per employee ({symbol})</label>
+                  <label className="lbl">
+                    Training per employee ({symbol})
+                  </label>
                   <input
                     className="inp"
                     type="number"
                     value={trainingPerEmployee}
                     onChange={(e) =>
-                      setTrainingPerEmployee(parseInt(e.target.value || "0", 10))
+                      setTrainingPerEmployee(
+                        parseInt(e.target.value || "0", 10)
+                      )
                     }
                   />
                 </div>
@@ -421,7 +440,9 @@ export default function Page() {
                     className="inp"
                     type="number"
                     value={programMonths}
-                    onChange={(e) => setProgramMonths(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setProgramMonths(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
               </div>
@@ -442,8 +463,8 @@ export default function Page() {
             <div>
               <h2 className="title">AI Adoption</h2>
               <p className="muted text-sm mb-4">
-                Select a rough maturity level. We estimate baseline weekly hours saved, then refine
-                with priorities & training.
+                Select a rough maturity level. We estimate baseline weekly hours
+                saved, then refine with priorities & training.
               </p>
 
               <div className="grid md:grid-cols-[1fr_420px] gap-6 items-start">
@@ -454,7 +475,9 @@ export default function Page() {
                     min={1}
                     max={10}
                     value={maturity}
-                    onChange={(e) => setMaturity(parseInt(e.target.value, 10))}
+                    onChange={(e) =>
+                      setMaturity(parseInt(e.target.value, 10))
+                    }
                     className="w-full range-slim"
                     style={{ accentColor: vividAzure }}
                   />
@@ -473,10 +496,14 @@ export default function Page() {
                 </div>
 
                 <div className="card">
-                  <div className="text-sm font-semibold muted mb-2">Estimated hours saved</div>
+                  <div className="text-sm font-semibold muted mb-2">
+                    Estimated hours saved
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="card" style={{ background: "#0e1216" }}>
-                      <div className="text-xs muted mb-1">Per employee / week</div>
+                      <div className="text-xs muted mb-1">
+                        Per employee / week
+                      </div>
                       <div className="text-4xl leading-none font-extrabold">
                         {maturityToHours(maturity).toFixed(1)}
                       </div>
@@ -523,20 +550,27 @@ export default function Page() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold">{PRIORITY_META[k].label}</span>
+                        <span className="font-semibold">
+                          {PRIORITY_META[k].label}
+                        </span>
                         <button
                           onClick={() => {
-                            if (active) setSelected(selected.filter((x) => x !== k));
+                            if (active)
+                              setSelected(selected.filter((x) => x !== k));
                             else if (!disabled) setSelected([...selected, k]);
                           }}
                           className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                            active ? "bg-[var(--bg-chip)] text-white" : "bg-[#22252c] text-white"
+                            active
+                              ? "bg-[var(--bg-chip)] text-white"
+                              : "bg-[#22252c] text-white"
                           }`}
                         >
                           {active ? "Selected" : "Select"}
                         </button>
                       </div>
-                      <div className="text-sm muted mt-1">{PRIORITY_META[k].blurb}</div>
+                      <div className="text-sm muted mt-1">
+                        {PRIORITY_META[k].blurb}
+                      </div>
                     </div>
                   );
                 })}
@@ -557,7 +591,9 @@ export default function Page() {
           {step === "throughput" && (
             <div>
               <h2 className="title">Throughput</h2>
-              <p className="muted text-sm mb-4">Quick edit of assumptions for throughput impact.</p>
+              <p className="muted text-sm mb-4">
+                Quick edit of assumptions for throughput impact.
+              </p>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
@@ -568,7 +604,9 @@ export default function Page() {
                     min={0}
                     max={30}
                     value={throughputPct}
-                    onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setThroughputPct(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
                 <div className="card">
@@ -579,7 +617,9 @@ export default function Page() {
                     min={0}
                     max={30}
                     value={handoffPct}
-                    onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setHandoffPct(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
               </div>
@@ -607,12 +647,11 @@ export default function Page() {
                 <button
                   className="btn"
                   onClick={() => {
-                    // jump to next chosen config or results
-                    const future = (["retention", "upskilling"] as PriorityKey[]).filter((k) =>
-                      selected.includes(k)
+                    const future = (["retention", "upskilling"] as PriorityKey[]).filter(
+                      (k) => selected.includes(k)
                     );
                     if (future.length === 0) setStep("results");
-                    else setStep(future[0] as StepKey);
+                    else setStep(future[0] as WizardStep);
                   }}
                 >
                   Continue →
@@ -634,7 +673,9 @@ export default function Page() {
                     min={0}
                     max={30}
                     value={retentionLiftPct}
-                    onChange={(e) => setRetentionLiftPct(parseInt(e.target.value || "0", 10))}
+                    onChange={(e) =>
+                      setRetentionLiftPct(parseInt(e.target.value || "0", 10))
+                    }
                   />
                 </div>
                 <div className="card">
@@ -711,7 +752,9 @@ export default function Page() {
                     min={0}
                     step={0.1}
                     value={upskillHoursPerWeek}
-                    onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))}
+                    onChange={(e) =>
+                      setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))
+                    }
                   />
                 </div>
               </div>
@@ -768,7 +811,9 @@ export default function Page() {
                 </div>
                 <div className="kpi">
                   <div className="kpi__label">Total hours saved (est.)</div>
-                  <div className="kpi__value">{(weeklyTotal * 52).toLocaleString()}</div>
+                  <div className="kpi__value">
+                    {(weeklyTotal * 52).toLocaleString()}
+                  </div>
                 </div>
               </div>
 
@@ -796,9 +841,13 @@ export default function Page() {
                     >
                       <div>
                         <div className="font-bold">{PRIORITY_META[k].label}</div>
-                        <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
+                        <div className="text-sm muted">
+                          {PRIORITY_META[k].blurb}
+                        </div>
                       </div>
-                      <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
+                      <div className="text-right font-semibold">
+                        {hours.toLocaleString()} h
+                      </div>
                       <div className="text-right font-semibold">
                         {symbol}
                         {Math.round(value).toLocaleString()}
@@ -829,8 +878,8 @@ export default function Page() {
                     Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.
                   </li>
                   <li>
-                    Launch “AI Champions” cohort; set quarterly ROI reviews; track usage to correlate
-                    with retention.
+                    Launch “AI Champions” cohort; set quarterly ROI reviews; track usage to
+                    correlate with retention.
                   </li>
                   <li>
                     Set competency coverage target to 60% and measure weekly AI-in-task usage.
