@@ -71,27 +71,11 @@ const AZURE = "#00D7FF";
 function Pill({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div
-      className="rounded-[20px] px-5 py-4 text-center"
+      className="rounded-[16px] px-5 py-4 text-center"
       style={{ background: "rgba(0,0,0,0.85)", boxShadow: `0 0 0 2px ${AZURE}` }}
     >
       <div className="text-sm opacity-80">{label}</div>
       <div className="text-lg font-semibold mt-1">{value}</div>
-    </div>
-  );
-}
-
-function RoiTile({ value }: { value: number }) {
-  return (
-    <div
-      className="flex flex-col items-center justify-center rounded-[20px] p-4 h-full"
-      style={{ background: "rgba(0,0,0,0.85)", boxShadow: `0 0 0 2px ${AZURE}` }}
-    >
-      <div className="text-lg font-semibold" style={{ color: AZURE }}>
-        Annual ROI
-      </div>
-      <div className="text-5xl font-extrabold mt-2" style={{ color: AZURE }}>
-        {isFinite(value) ? value.toFixed(1) : "—"}×
-      </div>
     </div>
   );
 }
@@ -118,7 +102,10 @@ export default function Page() {
   /* Step 2: adoption (1..10) */
   const [adoption, setAdoption] = useState(5);
   const maturityHoursPerPerson = useMemo(() => maturityToHours(adoption), [adoption]);
-  const maturityHoursTeam = useMemo(() => Math.round(maturityHoursPerPerson * headcount), [maturityHoursPerPerson, headcount]);
+  const maturityHoursTeam = useMemo(
+    () => Math.round(maturityHoursPerPerson * headcount),
+    [maturityHoursPerPerson, headcount]
+  );
   const numberTrained = useMemo(() => Math.round(headcount * (adoption / 10)), [headcount, adoption]); // simple mapping
 
   /* Step 3: priorities */
@@ -174,7 +161,7 @@ export default function Page() {
         ? Math.round(baseWeeklyTeamHours * 0.2)
         : 0,
       onboarding: selected.includes("onboarding")
-        ? Math.round(8 * headcount) // modest
+        ? Math.round(8 * headcount) // modest baseline
         : 0,
       retention: selected.includes("retention")
         ? Math.round(((headcount * (baselineAttritionPct / 100)) * (retentionLiftPct / 100) * 120) / 52)
@@ -205,10 +192,17 @@ export default function Page() {
   const annualROI = useMemo(() => (programCost === 0 ? 0 : annualValue / programCost), [annualValue, programCost]);
   const paybackMonths = useMemo(() => (monthlyValue === 0 ? Infinity : programCost / monthlyValue), [programCost, monthlyValue]);
 
+  // New metric: Estimated Productivity Gain % (weekly, vs 40h/employee)
+  const productivityGainPct = useMemo(() => {
+    const denom = headcount * 40;
+    return denom > 0 ? (weeklyTotal / denom) * 100 : 0;
+  }, [weeklyTotal, headcount]);
+
   /* Flow helpers: visit ALL chosen configs before results */
   function currentLinearFlow(): WizardStep[] {
     const base: WizardStep[] = ["team", "adoption", "priorities"];
-    const chosenConfigs: WizardStep[] = priorityOrder.filter((k) => selected.includes(k)).map((k) => k as WizardStep);
+    const chosenConfigs: WizardStep[] = ["throughput", "retention", "upskilling"]
+      .filter((k) => selected.includes(k as PriorityKey)) as WizardStep[];
     return [...base, ...chosenConfigs, "results"];
   }
 
@@ -222,14 +216,12 @@ export default function Page() {
   };
 
   const CONTINUE = () => {
-    // Special handling: from priorities, jump to the FIRST chosen config (not results)
     if (stepKey === "priorities") {
       if (selected.length < 3) return;
-      const first = priorityOrder.find((k) => selected.includes(k));
+      const first = ["throughput", "retention", "upskilling"].find((k) => selected.includes(k as PriorityKey));
       setStepKey((first as WizardStep) ?? "results");
       return;
     }
-    // Generic next
     const order = currentLinearFlow();
     const idx = order.indexOf(stepKey);
     if (idx >= 0 && idx < order.length - 1) setStepKey(order[idx + 1]);
@@ -247,14 +239,14 @@ export default function Page() {
   /* ---------- UI ---------- */
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-page)", color: "var(--text)" }}>
-      {/* Styles: slider alignment + compact aggs + results grid rows */}
+      {/* Styles: slider alignment + compact aggs + equal-size results grid */}
       <style jsx>{`
         .progress-rail {
           width: 100%;
           height: 10px;
           border-radius: 9999px;
           background: #0c0f14;
-          box-shadow: inset 0 0 6px rgba(0,0,0,0.7);
+          box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.7);
           position: relative;
         }
         .progress-fill {
@@ -264,39 +256,39 @@ export default function Page() {
           box-shadow: 0 0 12px ${AZURE}, 0 0 4px ${AZURE} inset;
           transition: width 150ms ease;
         }
+        /* Range: stack the input exactly over the rail so the thumb sits on it */
+        .range-wrap { position: relative; height: 10px; }
         input.range-slim {
           -webkit-appearance: none;
           appearance: none;
-          width: 100%;
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 10px; /* match the rail height */
           background: transparent;
-          height: 0; /* we use the rail above */
+          margin: 0;
+          padding: 0;
         }
         input.range-slim::-webkit-slider-runnable-track {
-          height: 10px; /* match rail */
-          background: transparent;
+          height: 10px; background: transparent;
         }
         input.range-slim::-moz-range-track {
-          height: 10px;
-          background: transparent;
+          height: 10px; background: transparent;
         }
         input.range-slim::-webkit-slider-thumb {
           -webkit-appearance: none;
-          width: 18px;
-          height: 18px;
-          margin-top: -4px; /* centers thumb on 10px rail */
-          border-radius: 50%;
-          background: ${AZURE};
-          border: 2px solid #000;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: ${AZURE}; border: 2px solid #000;
           box-shadow: 0 0 12px ${AZURE};
+          margin-top: -4px; /* centers thumb on 10px track (WebKit) */
         }
         input.range-slim::-moz-range-thumb {
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: ${AZURE};
-          border: 2px solid #000;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: ${AZURE}; border: 2px solid #000;
           box-shadow: 0 0 12px ${AZURE};
         }
+
         .agg-row { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
         .agg-box {
           padding: 8px 14px;
@@ -309,8 +301,12 @@ export default function Page() {
         .agg-title { font-weight: 600; font-size: 0.9rem; }
         .agg-sub { opacity: 0.8; font-size: 0.75rem; }
         .agg-box--on { background: ${AZURE}; color: #000; border-color: ${AZURE}; }
-        /* results grid with equal row height so ROI can span two rows neatly */
-        .results-grid { grid-auto-rows: 1fr; }
+
+        /* Equal-sized results grid */
+        .results-grid { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; }
+        @media (max-width: 1024px) {
+          .results-grid { grid-template-columns: repeat(2, 1fr); }
+        }
       `}</style>
 
       {/* HERO */}
@@ -395,11 +391,11 @@ export default function Page() {
               <div className="grid md:grid-cols-[1fr_360px] gap-6">
                 <div className="card">
                   <label className="lbl mb-2">Where are you today? (1–10)</label>
-                  <div className="relative">
+                  <div className="range-wrap">
                     <div className="progress-rail">
                       <div className="progress-fill" style={{ width: `${((adoption - 1) / 9) * 100}%` }} />
                     </div>
-                    <input type="range" min={1} max={10} value={adoption} onChange={(e) => setAdoption(parseInt(e.target.value, 10))} className="w-full range-slim mt-0" />
+                    <input type="range" min={1} max={10} value={adoption} onChange={(e) => setAdoption(parseInt(e.target.value, 10))} className="range-slim" />
                   </div>
                   <div className="flex justify-between mt-2 font-semibold" style={{ color: "var(--text-dim)", fontSize: "15px" }}>
                     {Array.from({ length: 10 }).map((_, i) => <span key={i}>{i + 1}</span>)}
@@ -583,22 +579,21 @@ export default function Page() {
             <div>
               <h2 className="title">Results</h2>
 
-              {/* Header: ROI square (double height) + 3x2 metric pills */}
-              <div className="grid md:grid-cols-3 gap-4 results-grid">
-                <div className="md:row-span-2 aspect-square">
-                  <RoiTile value={annualROI} />
-                </div>
-                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Pill label="Total Value" value={<>{symbol}{Math.round(annualValue).toLocaleString()}</>} />
-                  <Pill label="Total Hours Saved" value={(weeklyTotal * 52).toLocaleString()} />
-                  <Pill label="Payback Period" value={isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"} />
-                  <Pill label="No. Trained" value={numberTrained.toLocaleString()} />
-                  <Pill label="Cost per Seat" value={<>{symbol}{seatUSD.toLocaleString()}</>} />
-                  <Pill label="Program Cost" value={<>{symbol}{(seatUSD * headcount).toLocaleString()}</>} />
-                </div>
+              {/* 8 equal-sized metric boxes, 4×2 grid */}
+              <div className="grid gap-4 results-grid">
+                {/* Row 1 */}
+                <Pill label="Total Value" value={<>{symbol}{Math.round(annualValue).toLocaleString()}</>} />
+                <Pill label="Total Hours Saved" value={(weeklyTotal * 52).toLocaleString()} />
+                <Pill label="Payback Period" value={isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"} />
+                <Pill label="No. Trained" value={numberTrained.toLocaleString()} />
+                {/* Row 2 (ROI bottom-left as requested) */}
+                <Pill label="Annual ROI" value={<>{annualROI.toFixed(1)}×</>} />
+                <Pill label="Cost per Seat" value={<>{symbol}{seatUSD.toLocaleString()}</>} />
+                <Pill label="Program Cost" value={<>{symbol}{(seatUSD * headcount).toLocaleString()}</>} />
+                <Pill label="Estimated Productivity Gain" value={`${productivityGainPct.toFixed(1)}%`} />
               </div>
 
-              {/* Breakdown table (unchanged) */}
+              {/* Breakdown table */}
               <div className="mt-6 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
                 <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold table-header">
                   <div>PRIORITY</div>
@@ -606,22 +601,24 @@ export default function Page() {
                   <div className="text-right">ANNUAL VALUE</div>
                 </div>
 
-                {keys.filter((k) => selected.includes(k)).map((k) => {
-                  const hours = Math.round(weeklyHours[k] * 52);
-                  const value = hours * hourlyCost;
-                  return (
-                    <div key={k} className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-row">
-                      <div>
-                        <div className="font-bold">{PRIORITY_META[k].label}</div>
-                        <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
+                {keys
+                  .filter((k) => selected.includes(k))
+                  .map((k) => {
+                    const hours = Math.round(weeklyHours[k] * 52);
+                    const value = hours * hourlyCost;
+                    return (
+                      <div key={k} className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-row">
+                        <div>
+                          <div className="font-bold">{PRIORITY_META[k].label}</div>
+                          <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
+                        </div>
+                        <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
+                        <div className="text-right font-semibold">
+                          {symbol}{Math.round(value).toLocaleString()}
+                        </div>
                       </div>
-                      <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
-                      <div className="text-right font-semibold">
-                        {symbol}{Math.round(value).toLocaleString()}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
 
                 <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-total">
                   <div className="font-extrabold">Total</div>
