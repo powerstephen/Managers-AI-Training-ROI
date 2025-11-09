@@ -90,7 +90,7 @@ function Pill({ label, value }: { label: string; value: React.ReactNode }) {
 function RoiTile({ value }: { value: number }) {
   return (
     <div
-      className="flex flex-col items-center justify-center rounded-[28px] w-full h-full min-h-[220px] p-6"
+      className="flex flex-col items-center justify-center rounded-[28px] w/full h/full min-h-[220px] p-6"
       style={{ background: "rgba(0,0,0,0.85)", boxShadow: `0 0 0 3px ${AZURE}` }}
     >
       <div className="text-lg font-semibold" style={{ color: AZURE }}>
@@ -122,9 +122,8 @@ export default function Page() {
   const [currency, setCurrency] = useState<Currency>("EUR");
   const [avgSalary, setAvgSalary] = useState(52000);
 
-  /* Price per seat: auto-tiers in USD → converted by symbol (simple display) */
+  /* Price per seat: auto-tiers in USD → symbol-only conversion (display) */
   const seatUSD = headcount >= 1000 ? 299 : headcount >= 100 ? 349 : 399;
-  // For display only, we show local symbol with same numeric (simple symbol switch):
   const symbol = CURRENCY_SYMBOL[currency];
 
   /* Derived costs */
@@ -139,11 +138,11 @@ export default function Page() {
     [maturityHoursPerPerson, headcount]
   );
 
-  // For Results pill: approximate trained coverage from 1..10 scale
+  // For Results pill: trained coverage from 1..10 scale
   const numberTrained = useMemo(() => Math.round(headcount * (adoption / 10)), [headcount, adoption]);
 
   /* Step 3: priorities */
-  const priorityOrder: PriorityKey[] = ["throughput", "retention", "upskilling"]; // the ones with config screens
+  const priorityOrder: PriorityKey[] = ["throughput", "retention", "upskilling"];
   const keys: PriorityKey[] = ["throughput", "quality", "onboarding", "retention", "upskilling", "costAvoidance"];
   const [selected, setSelected] = useState<PriorityKey[]>(
     keys.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 3)
@@ -176,7 +175,8 @@ export default function Page() {
     if (k === "retention") {
       setRetentionAgg(level);
       if (level === "low") { setRetentionLiftPct(1); setBaselineAttritionPct(10); }
-      if (level === "avg") { setRetentionLiftPct(2); setBaselineAttrritionPct(12); } // <-- typo fix below
+      if (level === "avg") { setRetentionLiftPct(2); setBaselineAttritionPct(12); } // fixed typo
+      if (level === "high") { setRetentionLiftPct(3); setBaselineAttritionPct(15); }
     }
     if (k === "upskilling") {
       setUpskillingAgg(level);
@@ -185,9 +185,6 @@ export default function Page() {
       if (level === "high") { setUpskillCoveragePct(80); setUpskillHoursPerWeek(2); }
     }
   };
-  // fix minor typo in avg branch for retention baseline
-  // @ts-ignore
-  const setRetentionAggAvgGuard = (function () {})();
 
   /* Hours model */
   const baseWeeklyTeamHours = useMemo(() => maturityHoursPerPerson * headcount, [maturityHoursPerPerson, headcount]);
@@ -242,7 +239,6 @@ export default function Page() {
   }
 
   const CONTINUE = () => {
-    // enforce min 3 priorities before leaving priorities screen
     if (stepKey === "priorities" && selected.length < 3) return;
     const order = currentLinearFlow();
     const idx = order.indexOf(stepKey);
@@ -359,7 +355,7 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Removed: Price per seat + Program cost inputs (you asked to show at end only) */}
+              {/* Inputs removed: Price per seat & Program cost (shown at end only) */}
               <div className="grid md:grid-cols-3 gap-4 mt-6">
                 <div className="card md:col-span-1">
                   <label className="lbl">Average annual salary</label>
@@ -476,320 +472,3 @@ export default function Page() {
                         </button>
                       </div>
                       <div className="text-sm muted mt-1">{PRIORITY_META[k].blurb}</div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3">
-                <button className="btn-ghost" onClick={back}>← Back</button>
-                <button className="btn" onClick={CONTINUE} disabled={selected.length !== 3}>
-                  Continue →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP: Throughput */}
-          {stepKey === "throughput" && selected.includes("throughput") && (
-            <div>
-              <h2 className="title">Throughput</h2>
-              <p className="muted text-sm mb-4">Quick edit of assumptions for throughput impact.</p>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="card">
-                  <label className="lbl">Time reclaimed %</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    max={30}
-                    value={throughputPct}
-                    onChange={(e) => setThroughputPct(parseInt(e.target.value || "0", 10))}
-                  />
-                </div>
-                <div className="card">
-                  <label className="lbl">Handoffs reduced %</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    max={30}
-                    value={handoffPct}
-                    onChange={(e) => setHandoffPct(parseInt(e.target.value || "0", 10))}
-                  />
-                </div>
-              </div>
-
-              {/* Agg row BELOW inputs */}
-              <div className="agg-row">
-                {[
-                  { k: "low", t: "Low", sub: "(Conservative)" },
-                  { k: "avg", t: "Average", sub: "(Typical)" },
-                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
-                ].map((o) => (
-                  <button
-                    key={o.k}
-                    className={`agg-box ${throughputAgg === (o.k as any) ? "agg-box--on" : ""}`}
-                    onClick={() => applyAgg("throughput", o.k as any)}
-                  >
-                    <div className="agg-title">{o.t}</div>
-                    <div className="agg-sub">{o.sub}</div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3">
-                <button className="btn-ghost" onClick={back}>← Back</button>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    const after = nextChosenConfig("throughput");
-                    setStepKey(after ?? "results");
-                  }}
-                >
-                  Continue →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP: Retention */}
-          {stepKey === "retention" && selected.includes("retention") && (
-            <div>
-              <h2 className="title">Retention</h2>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="card">
-                  <label className="lbl">Attrition avoided %</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    max={30}
-                    value={retentionLiftPct}
-                    onChange={(e) => setRetentionLiftPct(parseInt(e.target.value || "0", 10))}
-                  />
-                </div>
-                <div className="card">
-                  <label className="lbl">Baseline attrition %</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    max={40}
-                    value={baselineAttritionPct}
-                    onChange={(e) => setBaselineAttritionPct(parseInt(e.target.value || "0", 10))}
-                  />
-                </div>
-              </div>
-
-              {/* Agg row BELOW inputs */}
-              <div className="agg-row">
-                {[
-                  { k: "low", t: "Low", sub: "(Conservative)" },
-                  { k: "avg", t: "Average", sub: "(Typical)" },
-                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
-                ].map((o) => (
-                  <button
-                    key={o.k}
-                    className={`agg-box ${retentionAgg === (o.k as any) ? "agg-box--on" : ""}`}
-                    onClick={() => applyAgg("retention", o.k as any)}
-                  >
-                    <div className="agg-title">{o.t}</div>
-                    <div className="agg-sub">{o.sub}</div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3">
-                <button className="btn-ghost" onClick={back}>← Back</button>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    const after = nextChosenConfig("retention");
-                    setStepKey(after ?? "results");
-                  }}
-                >
-                  Continue →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP: Upskilling */}
-          {stepKey === "upskilling" && selected.includes("upskilling") && (
-            <div>
-              <h2 className="title">Upskilling</h2>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="card">
-                  <label className="lbl">Coverage target %</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={upskillCoveragePct}
-                    onChange={(e) => setUpskillCoveragePct(parseInt(e.target.value || "0", 10))}
-                  />
-                </div>
-                <div className="card">
-                  <label className="lbl">Hours / week per person</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    step={0.1}
-                    value={upskillHoursPerWeek}
-                    onChange={(e) => setUpskillHoursPerWeek(parseFloat(e.target.value || "0"))}
-                  />
-                </div>
-              </div>
-
-              {/* Agg row BELOW inputs */}
-              <div className="agg-row">
-                {[
-                  { k: "low", t: "Low", sub: "(Conservative)" },
-                  { k: "avg", t: "Average", sub: "(Typical)" },
-                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
-                ].map((o) => (
-                  <button
-                    key={o.k}
-                    className={`agg-box ${upskillingAgg === (o.k as any) ? "agg-box--on" : ""}`}
-                    onClick={() => applyAgg("upskilling", o.k as any)}
-                  >
-                    <div className="agg-title">{o.t}</div>
-                    <div className="agg-sub">{o.sub}</div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3">
-                <button className="btn-ghost" onClick={back}>← Back</button>
-                <button className="btn" onClick={() => go("results")}>Continue →</button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP: Results */}
-          {stepKey === "results" && (
-            <div>
-              <h2 className="title">Results</h2>
-
-              {/* NEW header layout: left big ROI, right 6 pills */}
-              <div className="grid md:grid-cols-3 gap-4">
-                <div className="md:col-span-1">
-                  <RoiTile value={annualROI} />
-                </div>
-                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Pill
-                    label="Total Value"
-                    value={
-                      <>
-                        {symbol}
-                        {Math.round(annualValue).toLocaleString()}
-                      </>
-                    }
-                  />
-                  <Pill
-                    label="Total Hours Saved"
-                    value={(weeklyTotal * 52).toLocaleString()}
-                  />
-                  <Pill
-                    label="Payback Period"
-                    value={isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"}
-                  />
-                  <Pill
-                    label="No. Trained"
-                    value={numberTrained.toLocaleString()}
-                  />
-                  <Pill
-                    label="Cost per Seat"
-                    value={
-                      <>
-                        {symbol}
-                        {seatUSD.toLocaleString()}
-                      </>
-                    }
-                  />
-                  <Pill
-                    label="Program Cost"
-                    value={
-                      <>
-                        {symbol}
-                        {(seatUSD * headcount).toLocaleString()}
-                      </>
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Breakdown table (unchanged) */}
-              <div className="mt-6 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
-                <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold table-header">
-                  <div>PRIORITY</div>
-                  <div className="text-right">HOURS SAVED</div>
-                  <div className="text-right">ANNUAL VALUE</div>
-                </div>
-
-                {keys
-                  .filter((k) => selected.includes(k))
-                  .map((k) => {
-                    const hours = Math.round(weeklyHours[k] * 52);
-                    const value = hours * hourlyCost;
-                    return (
-                      <div key={k} className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-row">
-                        <div>
-                          <div className="font-bold">{PRIORITY_META[k].label}</div>
-                          <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
-                        </div>
-                        <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
-                        <div className="text-right font-semibold">
-                          {symbol}
-                          {Math.round(value).toLocaleString()}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-total">
-                  <div className="font-extrabold">Total</div>
-                  <div className="text-right font-extrabold">{(weeklyTotal * 52).toLocaleString()} h</div>
-                  <div className="text-right font-extrabold">
-                    {symbol}
-                    {Math.round(annualValue).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="card mt-6">
-                <div className="text-sm font-bold mb-2">Next steps</div>
-                <ul className="list-disc pl-5 space-y-1 text-sm muted">
-                  <li>Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.</li>
-                  <li>Launch “AI Champions” cohort; set quarterly ROI reviews; track usage to correlate with retention.</li>
-                  <li>Set competency coverage target to 60% and measure weekly AI-in-task usage.</li>
-                </ul>
-              </div>
-
-              <div className="mt-6 flex justify-between">
-                <button className="btn-ghost" onClick={back}>← Back</button>
-                <button className="btn" onClick={reset}>Start over</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  /* move to the next chosen config after the given one */
-  function nextChosenConfig(current: "throughput" | "retention" | "upskilling"): WizardStep | null {
-    const order: PriorityKey[] = ["throughput", "retention", "upskilling"];
-    const idx = order.indexOf(current);
-    for (let i = idx + 1; i < order.length; i++) {
-      if (selected.includes(order[i])) return order[i] as WizardStep;
-    }
-    return null;
-  }
-}
