@@ -33,11 +33,11 @@ type WizardStep =
 
 const PRIORITY_META: Record<PriorityKey, { label: string; blurb: string; defaultOn?: boolean }> = {
   throughput: { label: "Throughput", blurb: "Reduce cycle time and handoffs to ship faster.", defaultOn: true },
-  quality: { label: "Quality", blurb: "Reduce rework via better first-pass yield and QA.", defaultOn: true },
-  onboarding: { label: "Onboarding", blurb: "Accelerate ramp time with guided workflows and AI assist.", defaultOn: true },
+  quality: { label: "Quality", blurb: "Reduce rework and lift first-pass yield (less do-overs).", defaultOn: true },
+  onboarding: { label: "Onboarding", blurb: "Accelerate ramp with guided workflows and AI assist.", defaultOn: true },
   retention: { label: "Retention", blurb: "Reduce regretted attrition via better tooling and enablement." },
   upskilling: { label: "Upskilling", blurb: "Grow competency coverage; unlock compounding gains." },
-  costAvoidance: { label: "Cost avoidance", blurb: "Avoid outside spend/overtime via automation/self-service." },
+  costAvoidance: { label: "Cost avoidance", blurb: "Avoid overtime/outside spend via automation/self-service." },
 };
 
 const AZURE = "#00D7FF";
@@ -156,12 +156,21 @@ export default function Page() {
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(1.5);
   const [upskillingAgg, setUpskillingAgg] = useState<"low" | "avg" | "high">("avg");
-  // Quality (adjustable)
-  const [qualityPct, setQualityPct] = useState(20); // % of base weekly hours regained
-  // Onboarding (adjustable)
-  const [onboardingHoursPerPerson, setOnboardingHoursPerPerson] = useState(0.5); // hours/week/employee
-  // Cost Avoidance (adjustable)
-  const [costAvoidancePct, setCostAvoidancePct] = useState(5); // % of base weekly hours avoided
+
+  // Quality (now 2 inputs + aggression)
+  const [qualityReworkPct, setQualityReworkPct] = useState(12);
+  const [qualityFirstPassPct, setQualityFirstPassPct] = useState(16);
+  const [qualityAgg, setQualityAgg] = useState<"low" | "avg" | "high">("avg");
+
+  // Onboarding (now coverage + hours + aggression)
+  const [onboardingCoveragePct, setOnboardingCoveragePct] = useState(20);
+  const [onboardingHoursPerPerson, setOnboardingHoursPerPerson] = useState(0.5);
+  const [onboardingAgg, setOnboardingAgg] = useState<"low" | "avg" | "high">("avg");
+
+  // Cost Avoidance (now 2 inputs + aggression)
+  const [costAvoidancePct, setCostAvoidancePct] = useState(5);
+  const [overtimeAvoidancePct, setOvertimeAvoidancePct] = useState(4);
+  const [costAgg, setCostAgg] = useState<"low" | "avg" | "high">("avg");
 
   /* Aggression preset handler */
   const applyAgg = (k: PriorityKey, level: "low" | "avg" | "high") => {
@@ -183,6 +192,24 @@ export default function Page() {
       if (level === "avg") { setUpskillCoveragePct(60); setUpskillHoursPerWeek(1.5); }
       if (level === "high") { setUpskillCoveragePct(80); setUpskillHoursPerWeek(2); }
     }
+    if (k === "quality") {
+      setQualityAgg(level);
+      if (level === "low") { setQualityReworkPct(8); setQualityFirstPassPct(10); }
+      if (level === "avg") { setQualityReworkPct(12); setQualityFirstPassPct(16); }
+      if (level === "high") { setQualityReworkPct(16); setQualityFirstPassPct(22); }
+    }
+    if (k === "onboarding") {
+      setOnboardingAgg(level);
+      if (level === "low") { setOnboardingCoveragePct(10); setOnboardingHoursPerPerson(0.3); }
+      if (level === "avg") { setOnboardingCoveragePct(20); setOnboardingHoursPerPerson(0.5); }
+      if (level === "high") { setOnboardingCoveragePct(30); setOnboardingHoursPerPerson(0.8); }
+    }
+    if (k === "costAvoidance") {
+      setCostAgg(level);
+      if (level === "low") { setCostAvoidancePct(3); setOvertimeAvoidancePct(2); }
+      if (level === "avg") { setCostAvoidancePct(5); setOvertimeAvoidancePct(4); }
+      if (level === "high") { setCostAvoidancePct(8); setOvertimeAvoidancePct(6); }
+    }
   };
 
   /* Hours model */
@@ -197,10 +224,10 @@ export default function Page() {
         ? Math.round(baseWeeklyTeamHours * ((throughputPct + handoffPct * 0.5) / 100))
         : 0,
       quality: selected.includes("quality")
-        ? Math.round(baseWeeklyTeamHours * (qualityPct / 100))
+        ? Math.round(baseWeeklyTeamHours * ((qualityReworkPct + qualityFirstPassPct * 0.5) / 100))
         : 0,
       onboarding: selected.includes("onboarding")
-        ? Math.round(onboardingHoursPerPerson * headcount)
+        ? Math.round((onboardingCoveragePct / 100) * headcount * Math.max(0, onboardingHoursPerPerson))
         : 0,
       retention: selected.includes("retention")
         ? Math.round(((headcount * (baselineAttritionPct / 100)) * (retentionLiftPct / 100) * 120) / 52)
@@ -209,7 +236,7 @@ export default function Page() {
         ? Math.round((upskillCoveragePct / 100) * headcount * Math.max(0, upskillHoursPerWeek))
         : 0,
       costAvoidance: selected.includes("costAvoidance")
-        ? Math.round(baseWeeklyTeamHours * (costAvoidancePct / 100))
+        ? Math.round(baseWeeklyTeamHours * ((costAvoidancePct + overtimeAvoidancePct * 0.5) / 100))
         : 0,
     };
     return v;
@@ -223,9 +250,12 @@ export default function Page() {
     baselineAttritionPct,
     upskillCoveragePct,
     upskillHoursPerWeek,
-    qualityPct,
+    qualityReworkPct,
+    qualityFirstPassPct,
+    onboardingCoveragePct,
     onboardingHoursPerPerson,
     costAvoidancePct,
+    overtimeAvoidancePct,
   ]);
 
   const weeklyTotal = useMemo(() => Object.values(weeklyHours).reduce((a, b) => a + b, 0), [weeklyHours]);
@@ -251,81 +281,34 @@ export default function Page() {
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-page)", color: "var(--text)" }}>
       <style jsx>{`
-        .progress-rail {
-          width: 100%;
-          height: 10px;
-          border-radius: 9999px;
-          background: #0c0f14;
-          position: relative;
-        }
-        .progress-fill {
-          height: 10px;
-          border-radius: 9999px;
-          background: ${AZURE};
-          box-shadow: 0 0 12px ${AZURE}, 0 0 4px ${AZURE} inset;
-          transition: width 150ms ease;
-        }
-        /* Slider: thumb sits centered on the rail */
+        .progress-rail { width: 100%; height: 10px; border-radius: 9999px; background: #0c0f14; position: relative; }
+        .progress-fill { height: 10px; border-radius: 9999px; background: ${AZURE}; box-shadow: 0 0 12px ${AZURE}, 0 0 4px ${AZURE} inset; transition: width 150ms ease; }
         .range-wrap { position: relative; height: 10px; }
-        input.range-slim {
-          -webkit-appearance: none;
-          appearance: none;
-          position: absolute; top: 0; left: 0; right: 0;
-          height: 10px; background: transparent; margin: 0; padding: 0;
-        }
+        input.range-slim { -webkit-appearance: none; appearance: none; position: absolute; top: 0; left: 0; right: 0; height: 10px; background: transparent; margin: 0; padding: 0; }
         input.range-slim::-webkit-slider-runnable-track { height: 10px; background: transparent; }
         input.range-slim::-moz-range-track { height: 10px; background: transparent; }
-        input.range-slim::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          width: 18px; height: 18px; border-radius: 50%;
-          background: ${AZURE}; border: 2px solid #000; box-shadow: 0 0 12px ${AZURE};
-          margin-top: -4px; /* centers on 10px rail */
-        }
-        input.range-slim::-moz-range-thumb {
-          width: 18px; height: 18px; border-radius: 50%;
-          background: ${AZURE}; border: 2px solid #000; box-shadow: 0 0 12px ${AZURE};
-        }
-        /* Aggression pills */
+        input.range-slim::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: ${AZURE}; border: 2px solid #000; box-shadow: 0 0 12px ${AZURE}; margin-top: -4px; }
+        input.range-slim::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: ${AZURE}; border: 2px solid #000; box-shadow: 0 0 12px ${AZURE}; }
         .agg-row { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
-        .agg-box {
-          padding: 8px 14px; border-radius: 9999px; background: #1a1a1a; border: 1px solid #333;
-          text-align: center; width: 110px;
-        }
+        .agg-box { padding: 8px 14px; border-radius: 9999px; background: #1a1a1a; border: 1px solid #333; text-align: center; width: 110px; }
         .agg-title { font-weight: 600; font-size: 0.9rem; }
         .agg-sub { opacity: 0.8; font-size: 0.75rem; }
         .agg-box--on { background: ${AZURE}; color: #000; border-color: ${AZURE}; }
-        /* Results grid: 3 equal tiles */
         .results-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         @media (max-width: 1024px) { .results-3 { grid-template-columns: 1fr; } }
-        /* Divider */
         .divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 12px; }
         .divider::before, .divider::after { content: ""; height: 1px; background: #1f2430; flex: 1; }
-        /* ROI circle */
-        .roi-circle {
-          border: 2px solid ${AZURE};
-          border-radius: 50%;
-          padding: 6px 12px;
-          display: inline-block;
-          box-shadow: 0 0 6px ${AZURE};
-        }
-        /* Table */
+        .roi-circle { border: 2px solid ${AZURE}; border-radius: 50%; padding: 6px 12px; display: inline-block; box-shadow: 0 0 6px ${AZURE}; }
         .fin-table { width: 100%; border-collapse: collapse; }
         .fin-table td, .fin-table th { padding: 10px 12px; }
         .fin-row { border-bottom: 1px solid #1f2430; }
         .fin-row--hi { border-bottom: 1px solid ${AZURE}; font-weight: 800; }
         .fin-cell-r { text-align: right; }
         .muted-80 { opacity: 0.8; }
-        /* Contact button (green) */
-        .btn-green {
-          background: #16a34a; /* green-600 */
-          color: white;
-          font-weight: 600;
-          padding: 0.5rem 1.25rem;
-          border-radius: 0.5rem;
-        }
+        .btn-green { background: #16a34a; color: white; font-weight: 600; padding: 0.5rem 1.25rem; border-radius: 0.5rem; }
       `}</style>
 
-      {/* HERO (image in /public/hero.png) */}
+      {/* HERO */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
         <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft" />
       </div>
@@ -584,16 +567,32 @@ export default function Page() {
             </div>
           )}
 
-          {/* QUALITY */}
+          {/* QUALITY (now 2 inputs + L/A/H) */}
           {stepKey === "quality" && selected.includes("quality") && (
             <div>
               <h2 className="title">Quality</h2>
               <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
-              <div className="grid md:grid-cols-1 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
-                  <label className="lbl">Quality improvement (% of base weekly hours)</label>
-                  <input className="inp" type="number" min={0} max={50} value={qualityPct} onChange={(e) => setQualityPct(parseInt(e.target.value || "0", 10))} />
+                  <label className="lbl">Rework reduction %</label>
+                  <input className="inp" type="number" min={0} max={50} value={qualityReworkPct} onChange={(e) => setQualityReworkPct(parseInt(e.target.value || "0", 10))} />
                 </div>
+                <div className="card">
+                  <label className="lbl">First-pass yield lift %</label>
+                  <input className="inp" type="number" min={0} max={50} value={qualityFirstPassPct} onChange={(e) => setQualityFirstPassPct(parseInt(e.target.value || "0", 10))} />
+                </div>
+              </div>
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button key={o.k} className={`agg-box ${qualityAgg === (o.k as any) ? "agg-box--on" : ""}`} onClick={() => applyAgg("quality", o.k as any)}>
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
               </div>
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
@@ -602,16 +601,32 @@ export default function Page() {
             </div>
           )}
 
-          {/* ONBOARDING */}
+          {/* ONBOARDING (now coverage + hours + L/A/H) */}
           {stepKey === "onboarding" && selected.includes("onboarding") && (
             <div>
               <h2 className="title">Onboarding</h2>
               <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
-              <div className="grid md:grid-cols-1 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
-                  <label className="lbl">Hours / week saved per employee (onboarding/ramp)</label>
+                  <label className="lbl">Coverage target %</label>
+                  <input className="inp" type="number" min={0} max={100} value={onboardingCoveragePct} onChange={(e) => setOnboardingCoveragePct(parseInt(e.target.value || "0", 10))} />
+                </div>
+                <div className="card">
+                  <label className="lbl">Hours / week per person</label>
                   <input className="inp" type="number" min={0} step={0.1} value={onboardingHoursPerPerson} onChange={(e) => setOnboardingHoursPerPerson(parseFloat(e.target.value || "0"))} />
                 </div>
+              </div>
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button key={o.k} className={`agg-box ${onboardingAgg === (o.k as any) ? "agg-box--on" : ""}`} onClick={() => applyAgg("onboarding", o.k as any)}>
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
               </div>
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
@@ -620,180 +635,33 @@ export default function Page() {
             </div>
           )}
 
-          {/* COST AVOIDANCE */}
+          {/* COST AVOIDANCE (now 2 inputs + L/A/H) */}
           {stepKey === "costAvoidance" && selected.includes("costAvoidance") && (
             <div>
               <h2 className="title">Cost Avoidance</h2>
               <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
-              <div className="grid md:grid-cols-1 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="card">
-                  <label className="lbl">Hours avoided (% of base weekly hours)</label>
+                  <label className="lbl">Avoided low-value work %</label>
                   <input className="inp" type="number" min={0} max={30} value={costAvoidancePct} onChange={(e) => setCostAvoidancePct(parseInt(e.target.value || "0", 10))} />
                 </div>
+                <div className="card">
+                  <label className="lbl">Overtime/external spend avoided %</label>
+                  <input className="inp" type="number" min={0} max={30} value={overtimeAvoidancePct} onChange={(e) => setOvertimeAvoidancePct(parseInt(e.target.value || "0", 10))} />
+                </div>
+              </div>
+              <div className="agg-row">
+                {[
+                  { k: "low", t: "Low", sub: "(Conservative)" },
+                  { k: "avg", t: "Average", sub: "(Typical)" },
+                  { k: "high", t: "Aggressive", sub: "(Stretch)" },
+                ].map((o) => (
+                  <button key={o.k} className={`agg-box ${costAgg === (o.k as any) ? "agg-box--on" : ""}`} onClick={() => applyAgg("costAvoidance", o.k as any)}>
+                    <div className="agg-title">{o.t}</div>
+                    <div className="agg-sub">{o.sub}</div>
+                  </button>
+                ))}
               </div>
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
-                <button className="btn" onClick={CONTINUE}>Continue →</button>
-              </div>
-            </div>
-          )}
-
-          {/* RESULTS — 3 headline boxes */}
-          {stepKey === "results" && (
-            <div>
-              <h2 className="title">Results</h2>
-
-              <div className="results-3">
-                <Pill label="Total Annual Value" value={<>{symbol}{Math.round(annualValue).toLocaleString()}</>} />
-                <Pill label="Total Hours Saved" value={(weeklyTotal * 52).toLocaleString()} />
-                <Pill label="Productivity Gain (%)" value={`${productivityGainPct.toFixed(1)}%`} />
-              </div>
-
-              {/* Priority breakdown table */}
-              <div className="mt-6 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
-                <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold table-header">
-                  <div>PRIORITY</div>
-                  <div className="text-right">HOURS SAVED</div>
-                  <div className="text-right">ANNUAL VALUE</div>
-                </div>
-
-                {allPriorityKeys.filter((k) => selected.includes(k)).map((k) => {
-                  const hours = Math.round(weeklyHours[k] * 52);
-                  const value = hours * hourlyCost;
-                  return (
-                    <div key={k} className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-row">
-                      <div>
-                        <div className="font-bold">{PRIORITY_META[k].label}</div>
-                        <div className="text-sm muted">{PRIORITY_META[k].blurb}</div>
-                      </div>
-                      <div className="text-right font-semibold">{hours.toLocaleString()} h</div>
-                      <div className="text-right font-semibold">
-                        {symbol}{Math.round(value).toLocaleString()}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <div className="grid grid-cols-[1fr_180px_200px] items-center py-4 px-4 table-total">
-                  <div className="font-extrabold">Total</div>
-                  <div className="text-right font-extrabold">{(weeklyTotal * 52).toLocaleString()} h</div>
-                  <div className="text-right font-extrabold">
-                    {symbol}{Math.round(annualValue).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-between">
-                <button className="btn-ghost" onClick={back}>← Back</button>
-                <button className="btn" onClick={() => go("summary")}>Continue →</button>
-              </div>
-            </div>
-          )}
-
-          {/* SUMMARY — financial table + executive summary + CTA row */}
-          {stepKey === "summary" && (
-            <div>
-              <h2 className="title">Summary</h2>
-
-              <div className="divider"><span className="muted-80 font-semibold">Financial Summary</span></div>
-
-              <div className="card">
-                <table className="fin-table">
-                  <tbody>
-                    <tr className="fin-row fin-row--hi">
-                      <td><strong>Total Program Investment (Annual)</strong></td>
-                      <td className="muted-80">{numberTrained.toLocaleString()} × {symbol}{seatUSD.toLocaleString()}</td>
-                      <td className="fin-cell-r"><strong>{symbol}{programCost.toLocaleString()}</strong></td>
-                    </tr>
-                    <tr className="fin-row">
-                      <td>Number Trained</td>
-                      <td className="muted-80">—</td>
-                      <td className="fin-cell-r">{numberTrained.toLocaleString()}</td>
-                    </tr>
-                    <tr className="fin-row">
-                      <td>Cost per Seat</td>
-                      <td className="muted-80">—</td>
-                      <td className="fin-cell-r">{symbol}{seatUSD.toLocaleString()}</td>
-                    </tr>
-                    <tr className="fin-row">
-                      <td><strong>Estimated Value Generated (Annual)</strong></td>
-                      <td className="muted-80">Time saved × salary</td>
-                      <td className="fin-cell-r"><strong>{symbol}{Math.round(annualValue).toLocaleString()}</strong></td>
-                    </tr>
-                    <tr className="fin-row">
-                      <td>ROI</td>
-                      <td className="muted-80">Value ÷ Investment</td>
-                      <td className="fin-cell-r"><span className="roi-circle">{annualROI.toFixed(1)}×</span></td>
-                    </tr>
-                    <tr className="fin-row">
-                      <td>Payback Period</td>
-                      <td className="muted-80">Investment ÷ Monthly Value</td>
-                      <td className="fin-cell-r">{isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="divider"><span className="muted-80 font-semibold">Executive Summary</span></div>
-
-              <div className="card">
-                {/* Where you are today */}
-                <p className="text-sm muted mb-3">
-                  Based on your AI adoption score of <b>{adoption}</b>, your team is operating at the{" "}
-                  <b>{maturityExplainer[adoption - 1].split(":")[0]}</b> stage. {maturityExplainer[adoption - 1]}{" "}
-                  At this maturity level, you’re already reclaiming about <b>{maturityHoursTeam.toLocaleString()} hours/week</b> across the team,
-                  which can compound further by focusing on the selected priorities.
-                </p>
-
-                {/* What you can achieve */}
-                <p className="text-sm muted mb-3">
-                  With <b>{headcount.toLocaleString()}</b> employees in scope, the current model unlocks{" "}
-                  <b>{(weeklyTotal * 52).toLocaleString()} hours/year</b> — roughly{" "}
-                  <b>{(weeklyTotal * 52 / 1800).toFixed(1)} FTEs</b> of capacity — valued at{" "}
-                  <b>{symbol}{Math.round(annualValue).toLocaleString()}</b> annually. This translates to an ROI of{" "}
-                  <b>{annualROI.toFixed(1)}×</b> and a payback of <b>{isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"}</b>,
-                  with an estimated productivity gain of <b>{productivityGainPct.toFixed(1)}%</b>.
-                </p>
-
-                {/* Next steps + CTA text */}
-                <p className="text-sm muted">
-                  Given the scale of opportunity, <b>get in touch to discuss pilot programs</b> and how we can set next steps in motion
-                  across your top workflows. We’ll align on quick wins, formalize enablement, and track value capture from day one.
-                </p>
-                <ul className="list-disc pl-5 space-y-1 text-sm muted mt-3">
-                  <li>Prioritize 3 workflows for pilot; ship templates & QA/guardrails in 2 weeks.</li>
-                  <li>Launch an “AI Champions” enablement program to scale adoption.</li>
-                  <li>Track value capture monthly; review ROI quarterly and iterate.</li>
-                </ul>
-              </div>
-
-              {/* Footer row with centered Contact Us */}
-              <div className="mt-6 grid grid-cols-3 items-center">
-                <div className="justify-self-start">
-                  <button className="btn-ghost" onClick={() => go("results")}>← Back</button>
-                </div>
-                <div className="justify-self-center">
-                  <a
-                    className="btn-green"
-                    href={
-                      `mailto:spower@monaco.edu` +
-                      `?subject=${encodeURIComponent("AI Enablement Pilot — Next Steps")}` +
-                      `&body=${encodeURIComponent(
-                        `Hi Stephen,\n\nI'd like to discuss pilot programs and next steps for our team.\n\nContext:\n- Headcount: ${headcount}\n- Adoption score: ${adoption}\n- Estimated annual value: ${symbol}${Math.round(annualValue).toLocaleString()}\n- ROI: ${annualROI.toFixed(1)}x\n\nThanks,\n`
-                      )}`
-                    }
-                  >
-                    Contact Us
-                  </a>
-                </div>
-                <div className="justify-self-end">
-                  <button className="btn" onClick={reset}>Start over</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+                <button className
