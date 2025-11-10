@@ -42,11 +42,11 @@ const PRIORITY_META: Record<PriorityKey, { label: string; blurb: string; default
 
 const AZURE = "#00D7FF";
 
-/* Tiny reusable KPI tile */
+/* KPI tile (value text size increased) */
 function Pill({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div
-      className="rounded-2xl px-5 py-4 text-center"
+      className="rounded-2xl px-5 py-5 text-center"
       style={{
         background: "rgba(0,0,0,0.85)",
         borderBottom: `3px solid ${AZURE}`,
@@ -54,7 +54,8 @@ function Pill({ label, value }: { label: string; value: React.ReactNode }) {
       }}
     >
       <div className="text-sm opacity-80">{label}</div>
-      <div className="text-lg font-semibold mt-1">{value}</div>
+      {/* Bigger value text */}
+      <div className="mt-1 font-bold text-2xl md:text-3xl">{value}</div>
     </div>
   );
 }
@@ -265,6 +266,19 @@ export default function Page() {
   /* ---------- UI ---------- */
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-page)", color: "var(--text)" }}>
+      {/* Global CSS just for range thumb (no styled-jsx) */}
+      <style>{`
+        input.range-vivid::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: ${AZURE}; border: 2px solid #000; box-shadow: none;
+        }
+        input.range-vivid::-moz-range-thumb {
+          width: 18px; height: 18px; border-radius: 50%;
+          background: ${AZURE}; border: 2px solid #000; box-shadow: none;
+        }
+      `}</style>
+
       {/* HERO */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-6">
         <img src="/hero.png" alt="AI at Work — Brainster" className="hero-img shadow-soft" />
@@ -283,13 +297,14 @@ export default function Page() {
               ))}
             </div>
             <div className="w-full mt-3">
-              <div className="rounded-full h-2.5 bg-[#0c0f14]">
+              {/* Thinner rail, no glow */}
+              <div className="rounded-full bg-[#0c0f14]" style={{ height: 6 }}>
                 <div
-                  className="h-2.5 rounded-full"
+                  className="rounded-full"
                   style={{
+                    height: 6,
                     width: `${visibleProgress}%`,
                     background: AZURE,
-                    boxShadow: `0 0 12px ${AZURE}, inset 0 0 4px ${AZURE}`,
                     transition: "width 150ms ease",
                   }}
                 />
@@ -351,7 +366,7 @@ export default function Page() {
                 <div className="card">
                   <label className="lbl mb-2">Where are you today? (1–10)</label>
 
-                  {/* rail + thumb aligned via inline styles (safe, no styled-jsx) */}
+                  {/* rail + vivid-azure thumb */}
                   <div className="relative" style={{ height: 18 }}>
                     <div
                       className="absolute left-0 right-0 top-1/2 -translate-y-1/2 rounded-full"
@@ -363,7 +378,6 @@ export default function Page() {
                         height: 10,
                         width: `${((adoption - 1) / 9) * 100}%`,
                         background: AZURE,
-                        boxShadow: `0 0 12px ${AZURE}, inset 0 0 4px ${AZURE}`,
                       }}
                     />
                     <input
@@ -372,7 +386,7 @@ export default function Page() {
                       max={10}
                       value={adoption}
                       onChange={(e) => setAdoption(parseInt(e.target.value, 10))}
-                      className="w-full"
+                      className="w-full range-vivid"
                       style={{
                         WebkitAppearance: "none",
                         appearance: "none",
@@ -474,7 +488,6 @@ export default function Page() {
               </div>
 
               <AggRow active={throughputAgg} onPick={(lvl) => applyAgg("throughput", lvl)} />
-
               <NavRow onBack={back} onNext={CONTINUE} />
             </div>
           )}
@@ -497,7 +510,6 @@ export default function Page() {
               </div>
 
               <AggRow active={retentionAgg} onPick={(lvl) => applyAgg("retention", lvl)} />
-
               <NavRow onBack={back} onNext={CONTINUE} />
             </div>
           )}
@@ -520,7 +532,6 @@ export default function Page() {
               </div>
 
               <AggRow active={upskillingAgg} onPick={(lvl) => applyAgg("upskilling", lvl)} />
-
               <NavRow onBack={back} onNext={CONTINUE} />
             </div>
           )}
@@ -542,7 +553,6 @@ export default function Page() {
               </div>
 
               <AggRow active={qualityAgg} onPick={(lvl) => applyAgg("quality", lvl)} />
-
               <NavRow onBack={back} onNext={CONTINUE} />
             </div>
           )}
@@ -564,7 +574,6 @@ export default function Page() {
               </div>
 
               <AggRow active={onboardingAgg} onPick={(lvl) => applyAgg("onboarding", lvl)} />
-
               <NavRow onBack={back} onNext={CONTINUE} />
             </div>
           )}
@@ -586,12 +595,11 @@ export default function Page() {
               </div>
 
               <AggRow active={costAgg} onPick={(lvl) => applyAgg("costAvoidance", lvl)} />
-
               <NavRow onBack={back} onNext={CONTINUE} />
             </div>
           )}
 
-          {/* RESULTS — 3 headline boxes */}
+          {/* RESULTS — 3 headline boxes (bigger text already applied via Pill) */}
           {stepKey === "results" && (
             <div>
               <h2 className="title">Results</h2>
@@ -639,7 +647,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* SUMMARY — financial table + executive summary + CTA row */}
+          {/* SUMMARY */}
           {stepKey === "summary" && (
             <div>
               <h2 className="title">Summary</h2>
@@ -691,7 +699,7 @@ export default function Page() {
                         </span>
                       </td>
                     </tr>
-                    <tr className="">
+                    <tr>
                       <td className="py-2 px-3">Payback Period</td>
                       <td className="py-2 px-3 opacity-80">Investment ÷ Monthly Value</td>
                       <td className="py-2 px-3 text-right">{isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"}</td>
@@ -765,7 +773,7 @@ export default function Page() {
   );
 }
 
-/* --- Tiny presentational helpers (no styled-jsx needed) --- */
+/* --- Presentational helpers --- */
 function AggRow({
   active,
   onPick,
