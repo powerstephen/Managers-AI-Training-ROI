@@ -28,7 +28,8 @@ type WizardStep =
   | "adoption"
   | "priorities"
   | PriorityKey
-  | "results";
+  | "results"
+  | "summary";
 
 const PRIORITY_META: Record<
   PriorityKey,
@@ -106,6 +107,10 @@ export default function Page() {
   /* Step & navigation */
   const [stepKey, setStepKey] = useState<WizardStep>("team");
   const go = (key: WizardStep) => setStepKey(key);
+  const back = () => {
+    const idx = ALL_STEPS.findIndex((s) => s.key === stepKey);
+    if (idx > 0) setStepKey(ALL_STEPS[idx - 1].key);
+  };
   const reset = () => window.location.reload();
 
   /* Step 1: team basics */
@@ -157,11 +162,12 @@ export default function Page() {
       { key: "priorities", label: "Team Priorities" },
       ...dyn,
       { key: "results", label: "Results" },
+      { key: "summary", label: "Summary" },
     ] as const;
     return base.map((s, i) => ({ id: i + 1, key: s.key, label: s.label }));
   }, [selected]);
 
-  /* Priority inputs (now every priority has adjustable inputs) */
+  /* Priority inputs (adjustable for all) */
   // Throughput + aggression
   const [throughputPct, setThroughputPct] = useState(8);
   const [handoffPct, setHandoffPct] = useState(6);
@@ -174,14 +180,14 @@ export default function Page() {
   const [upskillCoveragePct, setUpskillCoveragePct] = useState(60);
   const [upskillHoursPerWeek, setUpskillHoursPerWeek] = useState(1.5);
   const [upskillingAgg, setUpskillingAgg] = useState<"low" | "avg" | "high">("avg");
-  // Quality (now adjustable)
+  // Quality (adjustable)
   const [qualityPct, setQualityPct] = useState(20); // % of base weekly hours regained
-  // Onboarding (now adjustable)
+  // Onboarding (adjustable)
   const [onboardingHoursPerPerson, setOnboardingHoursPerPerson] = useState(0.5); // hours / week / employee
-  // Cost Avoidance (now adjustable)
+  // Cost Avoidance (adjustable)
   const [costAvoidancePct, setCostAvoidancePct] = useState(5); // % of base weekly hours avoided
 
-  /* Aggression preset handler (kept for the 3 main) */
+  /* Aggression preset handler */
   const applyAgg = (k: PriorityKey, level: "low" | "avg" | "high") => {
     if (k === "throughput") {
       setThroughputAgg(level);
@@ -203,7 +209,7 @@ export default function Page() {
     }
   };
 
-  /* Hours model (uses the adjustable inputs above) */
+  /* Hours model */
   const baseWeeklyTeamHours = useMemo(
     () => maturityHoursPerPerson * headcount,
     [maturityHoursPerPerson, headcount]
@@ -273,10 +279,6 @@ export default function Page() {
   const stepIndex = ALL_STEPS.find((s) => s.key === stepKey)?.id ?? 1;
   const visibleProgress = ((stepIndex - 1) / (ALL_STEPS.length - 1)) * 100;
 
-  const back = () => {
-    const idx = ALL_STEPS.findIndex((s) => s.key === stepKey);
-    if (idx > 0) setStepKey(ALL_STEPS[idx - 1].key);
-  };
   const CONTINUE = () => {
     const idx = ALL_STEPS.findIndex((s) => s.key === stepKey);
     if (idx >= 0 && idx < ALL_STEPS.length - 1) setStepKey(ALL_STEPS[idx + 1].key);
@@ -329,9 +331,34 @@ export default function Page() {
         .agg-title { font-weight: 600; font-size: 0.9rem; }
         .agg-sub { opacity: 0.8; font-size: 0.75rem; }
         .agg-box--on { background: ${AZURE}; color: #000; border-color: ${AZURE}; }
-        /* Results grid: 4 x 2 (responsive to 2 x 4) */
-        .results-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-        @media (max-width: 1024px) { .results-grid { grid-template-columns: repeat(2, 1fr); } }
+        /* Results grid: 3 equal tiles */
+        .results-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        @media (max-width: 1024px) { .results-3 { grid-template-columns: 1fr; } }
+        /* Divider */
+        .divider {
+          display: flex; align-items: center; gap: 12px; margin: 20px 0 12px;
+        }
+        .divider::before, .divider::after {
+          content: ""; height: 1px; background: #1f2430; flex: 1;
+        }
+        /* ROI circle */
+        .roi-circle {
+          border: 2px solid ${AZURE};
+          border-radius: 50%;
+          padding: 6px 12px;
+          display: inline-block;
+          box-shadow: 0 0 6px ${AZURE};
+        }
+        /* Table */
+        .fin-table { width: 100%; border-collapse: collapse; }
+        .fin-table td, .fin-table th { padding: 10px 12px; }
+        .fin-row { border-bottom: 1px solid #1f2430; }
+        .fin-row--hi {
+          border-bottom: 1px solid ${AZURE};
+          font-weight: 800;
+        }
+        .fin-cell-r { text-align: right; }
+        .muted-80 { opacity: 0.8; }
       `}</style>
 
       {/* HERO (image in /public/hero.png) */}
@@ -482,7 +509,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* PRIORITY DETAIL — THROUGHPUT */}
+          {/* THROUGHPUT */}
           {stepKey === "throughput" && selected.includes("throughput") && (
             <div>
               <h2 className="title">Throughput</h2>
@@ -519,7 +546,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* PRIORITY DETAIL — RETENTION */}
+          {/* RETENTION */}
           {stepKey === "retention" && selected.includes("retention") && (
             <div>
               <h2 className="title">Retention</h2>
@@ -556,7 +583,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* PRIORITY DETAIL — UPSKILLING */}
+          {/* UPSKILLING */}
           {stepKey === "upskilling" && selected.includes("upskilling") && (
             <div>
               <h2 className="title">Upskilling</h2>
@@ -593,7 +620,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* PRIORITY DETAIL — QUALITY (now adjustable) */}
+          {/* QUALITY */}
           {stepKey === "quality" && selected.includes("quality") && (
             <div>
               <h2 className="title">Quality</h2>
@@ -601,7 +628,7 @@ export default function Page() {
 
               <div className="grid md:grid-cols-1 gap-4">
                 <div className="card">
-                  <label className="lbl">Quality improvement (as % of base weekly hours)</label>
+                  <label className="lbl">Quality improvement (% of base weekly hours)</label>
                   <input className="inp" type="number" min={0} max={50} value={qualityPct} onChange={(e) => setQualityPct(parseInt(e.target.value || "0", 10))} />
                 </div>
               </div>
@@ -613,7 +640,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* PRIORITY DETAIL — ONBOARDING (now adjustable) */}
+          {/* ONBOARDING */}
           {stepKey === "onboarding" && selected.includes("onboarding") && (
             <div>
               <h2 className="title">Onboarding</h2>
@@ -633,7 +660,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* PRIORITY DETAIL — COST AVOIDANCE (now adjustable) */}
+          {/* COST AVOIDANCE */}
           {stepKey === "costAvoidance" && selected.includes("costAvoidance") && (
             <div>
               <h2 className="title">Cost Avoidance</h2>
@@ -641,7 +668,7 @@ export default function Page() {
 
               <div className="grid md:grid-cols-1 gap-4">
                 <div className="card">
-                  <label className="lbl">Hours avoided (as % of base weekly hours)</label>
+                  <label className="lbl">Hours avoided (% of base weekly hours)</label>
                   <input className="inp" type="number" min={0} max={30} value={costAvoidancePct} onChange={(e) => setCostAvoidancePct(parseInt(e.target.value || "0", 10))} />
                 </div>
               </div>
@@ -653,24 +680,18 @@ export default function Page() {
             </div>
           )}
 
-          {/* RESULTS */}
+          {/* RESULTS — 3 headline boxes */}
           {stepKey === "results" && (
             <div>
               <h2 className="title">Results</h2>
 
-              {/* 8 equal tiles (4 × 2) */}
-              <div className="results-grid">
-                <Pill label="Total Value" value={<>{symbol}{Math.round(annualValue).toLocaleString()}</>} />
+              <div className="results-3">
+                <Pill label="Total Annual Value" value={<>{symbol}{Math.round(annualValue).toLocaleString()}</>} />
                 <Pill label="Total Hours Saved" value={(weeklyTotal * 52).toLocaleString()} />
-                <Pill label="Payback Period" value={isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"} />
-                <Pill label="No. Trained" value={numberTrained.toLocaleString()} />
-                <Pill label="Annual ROI" value={<>{annualROI.toFixed(1)}×</>} />
-                <Pill label="Cost per Seat" value={<>{symbol}{seatUSD.toLocaleString()}</>} />
-                <Pill label="Program Cost" value={<>{symbol}{(seatUSD * headcount).toLocaleString()}</>} />
-                <Pill label="Estimated Productivity Gain" value={`${productivityGainPct.toFixed(1)}%`} />
+                <Pill label="Productivity Gain (%)" value={`${productivityGainPct.toFixed(1)}%`} />
               </div>
 
-              {/* Breakdown table */}
+              {/* Breakdown table (kept for detail) */}
               <div className="mt-6 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
                 <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold table-header">
                   <div>PRIORITY</div>
@@ -704,17 +725,88 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="card mt-6">
-                <div className="text-sm font-bold mb-2">Next steps</div>
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={() => go("summary")}>Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {/* SUMMARY — financial table + narratives */}
+          {stepKey === "summary" && (
+            <div>
+              <h2 className="title">Summary</h2>
+
+              <div className="divider"><span className="muted-80 font-semibold">Financial Summary</span></div>
+
+              <div className="card">
+                <table className="fin-table">
+                  <tbody>
+                    <tr className="fin-row fin-row--hi">
+                      <td><strong>Total Program Investment (Annual)</strong></td>
+                      <td className="muted-80">{numberTrained.toLocaleString()} × {symbol}{seatUSD.toLocaleString()}</td>
+                      <td className="fin-cell-r"><strong>{symbol}{programCost.toLocaleString()}</strong></td>
+                    </tr>
+                    <tr className="fin-row">
+                      <td>Number Trained</td>
+                      <td className="muted-80">—</td>
+                      <td className="fin-cell-r">{numberTrained.toLocaleString()}</td>
+                    </tr>
+                    <tr className="fin-row">
+                      <td>Cost per Seat</td>
+                      <td className="muted-80">—</td>
+                      <td className="fin-cell-r">{symbol}{seatUSD.toLocaleString()}</td>
+                    </tr>
+                    <tr className="fin-row">
+                      <td><strong>Estimated Value Generated (Annual)</strong></td>
+                      <td className="muted-80">Time saved × salary</td>
+                      <td className="fin-cell-r"><strong>{symbol}{Math.round(annualValue).toLocaleString()}</strong></td>
+                    </tr>
+                    <tr className="fin-row">
+                      <td>ROI</td>
+                      <td className="muted-80">Value ÷ Investment</td>
+                      <td className="fin-cell-r">
+                        <span className="roi-circle">{annualROI.toFixed(1)}×</span>
+                      </td>
+                    </tr>
+                    <tr className="fin-row">
+                      <td>Payback Period</td>
+                      <td className="muted-80">Investment ÷ Monthly Value</td>
+                      <td className="fin-cell-r">{isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="divider"><span className="muted-80 font-semibold">Where You Are Today</span></div>
+              <div className="card">
+                <p className="text-sm muted">
+                  Based on your current AI adoption score of <b>{adoption}</b>, your team is at the{" "}
+                  <b>{maturityExplainer[adoption - 1].split(":")[0]}</b> stage.
+                  {" "}{maturityExplainer[adoption - 1]}
+                </p>
+              </div>
+
+              <div className="divider"><span className="muted-80 font-semibold">What You Can Achieve</span></div>
+              <div className="card">
+                <p className="text-sm muted">
+                  With {headcount.toLocaleString()} employees in scope, your model unlocks approximately{" "}
+                  {(weeklyTotal * 52).toLocaleString()} hours saved annually — equivalent to about{" "}
+                  {(weeklyTotal * 52 / 1800).toFixed(1)} full-time employees of capacity.
+                </p>
+              </div>
+
+              <div className="divider"><span className="muted-80 font-semibold">Next Steps</span></div>
+              <div className="card">
                 <ul className="list-disc pl-5 space-y-1 text-sm muted">
-                  <li>Map top 3 workflows → ship prompt templates & QA/guardrails within 2 weeks.</li>
-                  <li>Launch “AI Champions” cohort; track usage & correlate with retention quarterly.</li>
-                  <li>Set competency coverage target to 60% and measure weekly AI-in-task usage.</li>
+                  <li>Prioritize 3 workflows for pilot; ship templates & QA/guardrails in 2 weeks.</li>
+                  <li>Launch an “AI Champions” enablement program to scale adoption.</li>
+                  <li>Track value capture monthly; review ROI quarterly and iterate.</li>
                 </ul>
               </div>
 
               <div className="mt-6 flex justify-between">
-                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn-ghost" onClick={() => go("results")}>← Back</button>
                 <button className="btn" onClick={reset}>Start over</button>
               </div>
             </div>
