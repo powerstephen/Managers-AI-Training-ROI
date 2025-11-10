@@ -31,37 +31,13 @@ type WizardStep =
   | "results"
   | "summary";
 
-const PRIORITY_META: Record<
-  PriorityKey,
-  { label: string; blurb: string; defaultOn?: boolean }
-> = {
-  throughput: {
-    label: "Throughput",
-    blurb: "Reduce cycle time and handoffs to ship faster.",
-    defaultOn: true,
-  },
-  quality: {
-    label: "Quality",
-    blurb: "Reduce rework via better first-pass yield and QA.",
-    defaultOn: true,
-  },
-  onboarding: {
-    label: "Onboarding",
-    blurb: "Accelerate ramp time with guided workflows and AI assist.",
-    defaultOn: true,
-  },
-  retention: {
-    label: "Retention",
-    blurb: "Reduce regretted attrition through better tooling and enablement.",
-  },
-  upskilling: {
-    label: "Upskilling",
-    blurb: "Grow competency coverage; unlock compounding gains.",
-  },
-  costAvoidance: {
-    label: "Cost avoidance",
-    blurb: "Avoid outside spend/overtime via automation and self-service.",
-  },
+const PRIORITY_META: Record<PriorityKey, { label: string; blurb: string; defaultOn?: boolean }> = {
+  throughput: { label: "Throughput", blurb: "Reduce cycle time and handoffs to ship faster.", defaultOn: true },
+  quality: { label: "Quality", blurb: "Reduce rework via better first-pass yield and QA.", defaultOn: true },
+  onboarding: { label: "Onboarding", blurb: "Accelerate ramp time with guided workflows and AI assist.", defaultOn: true },
+  retention: { label: "Retention", blurb: "Reduce regretted attrition via better tooling and enablement." },
+  upskilling: { label: "Upskilling", blurb: "Grow competency coverage; unlock compounding gains." },
+  costAvoidance: { label: "Cost avoidance", blurb: "Avoid outside spend/overtime via automation/self-service." },
 };
 
 const AZURE = "#00D7FF";
@@ -150,7 +126,7 @@ export default function Page() {
     allPriorityKeys.filter((k) => PRIORITY_META[k].defaultOn).slice(0, 3)
   );
 
-  /* Dynamic steps based on actual selection (order as picked) */
+  /* Dynamic step list (reflects EXACT user picks + results + summary) */
   const ALL_STEPS: { id: number; key: WizardStep; label: string }[] = useMemo(() => {
     const dyn = selected.map((p) => ({
       key: p as WizardStep,
@@ -183,7 +159,7 @@ export default function Page() {
   // Quality (adjustable)
   const [qualityPct, setQualityPct] = useState(20); // % of base weekly hours regained
   // Onboarding (adjustable)
-  const [onboardingHoursPerPerson, setOnboardingHoursPerPerson] = useState(0.5); // hours / week / employee
+  const [onboardingHoursPerPerson, setOnboardingHoursPerPerson] = useState(0.5); // hours/week/employee
   // Cost Avoidance (adjustable)
   const [costAvoidancePct, setCostAvoidancePct] = useState(5); // % of base weekly hours avoided
 
@@ -227,11 +203,7 @@ export default function Page() {
         ? Math.round(onboardingHoursPerPerson * headcount)
         : 0,
       retention: selected.includes("retention")
-        ? Math.round(
-            ((headcount * (baselineAttritionPct / 100)) *
-              (retentionLiftPct / 100) *
-              120) / 52
-          )
+        ? Math.round(((headcount * (baselineAttritionPct / 100)) * (retentionLiftPct / 100) * 120) / 52)
         : 0,
       upskilling: selected.includes("upskilling")
         ? Math.round((upskillCoveragePct / 100) * headcount * Math.max(0, upskillHoursPerWeek))
@@ -256,20 +228,11 @@ export default function Page() {
     costAvoidancePct,
   ]);
 
-  const weeklyTotal = useMemo(
-    () => Object.values(weeklyHours).reduce((a, b) => a + b, 0),
-    [weeklyHours]
-  );
+  const weeklyTotal = useMemo(() => Object.values(weeklyHours).reduce((a, b) => a + b, 0), [weeklyHours]);
   const monthlyValue = useMemo(() => weeklyTotal * hourlyCost * 4, [weeklyTotal, hourlyCost]);
   const annualValue = useMemo(() => monthlyValue * 12, [monthlyValue]);
-  const annualROI = useMemo(
-    () => (programCost === 0 ? 0 : annualValue / programCost),
-    [annualValue, programCost]
-  );
-  const paybackMonths = useMemo(
-    () => (monthlyValue === 0 ? Infinity : programCost / monthlyValue),
-    [programCost, monthlyValue]
-  );
+  const annualROI = useMemo(() => (programCost === 0 ? 0 : annualValue / programCost), [annualValue, programCost]);
+  const paybackMonths = useMemo(() => (monthlyValue === 0 ? Infinity : programCost / monthlyValue), [programCost, monthlyValue]);
   const productivityGainPct = useMemo(() => {
     const denom = headcount * 40;
     return denom > 0 ? (weeklyTotal / denom) * 100 : 0;
@@ -335,12 +298,8 @@ export default function Page() {
         .results-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         @media (max-width: 1024px) { .results-3 { grid-template-columns: 1fr; } }
         /* Divider */
-        .divider {
-          display: flex; align-items: center; gap: 12px; margin: 20px 0 12px;
-        }
-        .divider::before, .divider::after {
-          content: ""; height: 1px; background: #1f2430; flex: 1;
-        }
+        .divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 12px; }
+        .divider::before, .divider::after { content: ""; height: 1px; background: #1f2430; flex: 1; }
         /* ROI circle */
         .roi-circle {
           border: 2px solid ${AZURE};
@@ -353,12 +312,17 @@ export default function Page() {
         .fin-table { width: 100%; border-collapse: collapse; }
         .fin-table td, .fin-table th { padding: 10px 12px; }
         .fin-row { border-bottom: 1px solid #1f2430; }
-        .fin-row--hi {
-          border-bottom: 1px solid ${AZURE};
-          font-weight: 800;
-        }
+        .fin-row--hi { border-bottom: 1px solid ${AZURE}; font-weight: 800; }
         .fin-cell-r { text-align: right; }
         .muted-80 { opacity: 0.8; }
+        /* Contact button (green) */
+        .btn-green {
+          background: #16a34a; /* green-600 */
+          color: white;
+          font-weight: 600;
+          padding: 0.5rem 1.25rem;
+          border-radius: 0.5rem;
+        }
       `}</style>
 
       {/* HERO (image in /public/hero.png) */}
@@ -625,14 +589,12 @@ export default function Page() {
             <div>
               <h2 className="title">Quality</h2>
               <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
-
               <div className="grid md:grid-cols-1 gap-4">
                 <div className="card">
                   <label className="lbl">Quality improvement (% of base weekly hours)</label>
                   <input className="inp" type="number" min={0} max={50} value={qualityPct} onChange={(e) => setQualityPct(parseInt(e.target.value || "0", 10))} />
                 </div>
               </div>
-
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
@@ -645,14 +607,12 @@ export default function Page() {
             <div>
               <h2 className="title">Onboarding</h2>
               <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
-
               <div className="grid md:grid-cols-1 gap-4">
                 <div className="card">
                   <label className="lbl">Hours / week saved per employee (onboarding/ramp)</label>
                   <input className="inp" type="number" min={0} step={0.1} value={onboardingHoursPerPerson} onChange={(e) => setOnboardingHoursPerPerson(parseFloat(e.target.value || "0"))} />
                 </div>
               </div>
-
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
@@ -665,14 +625,12 @@ export default function Page() {
             <div>
               <h2 className="title">Cost Avoidance</h2>
               <p className="muted text-sm mb-4">Use your inputs or the defaults; adjust to conservative or aggressive forecasting.</p>
-
               <div className="grid md:grid-cols-1 gap-4">
                 <div className="card">
                   <label className="lbl">Hours avoided (% of base weekly hours)</label>
                   <input className="inp" type="number" min={0} max={30} value={costAvoidancePct} onChange={(e) => setCostAvoidancePct(parseInt(e.target.value || "0", 10))} />
                 </div>
               </div>
-
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={CONTINUE}>Continue →</button>
@@ -691,7 +649,7 @@ export default function Page() {
                 <Pill label="Productivity Gain (%)" value={`${productivityGainPct.toFixed(1)}%`} />
               </div>
 
-              {/* Breakdown table (kept for detail) */}
+              {/* Priority breakdown table */}
               <div className="mt-6 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
                 <div className="grid grid-cols-[1fr_180px_200px] py-3 px-4 text-xs font-semibold table-header">
                   <div>PRIORITY</div>
@@ -732,7 +690,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* SUMMARY — financial table + narratives */}
+          {/* SUMMARY — financial table + executive summary + CTA row */}
           {stepKey === "summary" && (
             <div>
               <h2 className="title">Summary</h2>
@@ -765,9 +723,7 @@ export default function Page() {
                     <tr className="fin-row">
                       <td>ROI</td>
                       <td className="muted-80">Value ÷ Investment</td>
-                      <td className="fin-cell-r">
-                        <span className="roi-circle">{annualROI.toFixed(1)}×</span>
-                      </td>
+                      <td className="fin-cell-r"><span className="roi-circle">{annualROI.toFixed(1)}×</span></td>
                     </tr>
                     <tr className="fin-row">
                       <td>Payback Period</td>
@@ -778,36 +734,61 @@ export default function Page() {
                 </table>
               </div>
 
-              <div className="divider"><span className="muted-80 font-semibold">Where You Are Today</span></div>
-              <div className="card">
-                <p className="text-sm muted">
-                  Based on your current AI adoption score of <b>{adoption}</b>, your team is at the{" "}
-                  <b>{maturityExplainer[adoption - 1].split(":")[0]}</b> stage.
-                  {" "}{maturityExplainer[adoption - 1]}
-                </p>
-              </div>
+              <div className="divider"><span className="muted-80 font-semibold">Executive Summary</span></div>
 
-              <div className="divider"><span className="muted-80 font-semibold">What You Can Achieve</span></div>
               <div className="card">
-                <p className="text-sm muted">
-                  With {headcount.toLocaleString()} employees in scope, your model unlocks approximately{" "}
-                  {(weeklyTotal * 52).toLocaleString()} hours saved annually — equivalent to about{" "}
-                  {(weeklyTotal * 52 / 1800).toFixed(1)} full-time employees of capacity.
+                {/* Where you are today */}
+                <p className="text-sm muted mb-3">
+                  Based on your AI adoption score of <b>{adoption}</b>, your team is operating at the{" "}
+                  <b>{maturityExplainer[adoption - 1].split(":")[0]}</b> stage. {maturityExplainer[adoption - 1]}{" "}
+                  At this maturity level, you’re already reclaiming about <b>{maturityHoursTeam.toLocaleString()} hours/week</b> across the team,
+                  which can compound further by focusing on the selected priorities.
                 </p>
-              </div>
 
-              <div className="divider"><span className="muted-80 font-semibold">Next Steps</span></div>
-              <div className="card">
-                <ul className="list-disc pl-5 space-y-1 text-sm muted">
+                {/* What you can achieve */}
+                <p className="text-sm muted mb-3">
+                  With <b>{headcount.toLocaleString()}</b> employees in scope, the current model unlocks{" "}
+                  <b>{(weeklyTotal * 52).toLocaleString()} hours/year</b> — roughly{" "}
+                  <b>{(weeklyTotal * 52 / 1800).toFixed(1)} FTEs</b> of capacity — valued at{" "}
+                  <b>{symbol}{Math.round(annualValue).toLocaleString()}</b> annually. This translates to an ROI of{" "}
+                  <b>{annualROI.toFixed(1)}×</b> and a payback of <b>{isFinite(paybackMonths) ? `${paybackMonths.toFixed(1)} months` : "—"}</b>,
+                  with an estimated productivity gain of <b>{productivityGainPct.toFixed(1)}%</b>.
+                </p>
+
+                {/* Next steps + CTA text */}
+                <p className="text-sm muted">
+                  Given the scale of opportunity, <b>get in touch to discuss pilot programs</b> and how we can set next steps in motion
+                  across your top workflows. We’ll align on quick wins, formalize enablement, and track value capture from day one.
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-sm muted mt-3">
                   <li>Prioritize 3 workflows for pilot; ship templates & QA/guardrails in 2 weeks.</li>
                   <li>Launch an “AI Champions” enablement program to scale adoption.</li>
                   <li>Track value capture monthly; review ROI quarterly and iterate.</li>
                 </ul>
               </div>
 
-              <div className="mt-6 flex justify-between">
-                <button className="btn-ghost" onClick={() => go("results")}>← Back</button>
-                <button className="btn" onClick={reset}>Start over</button>
+              {/* Footer row with centered Contact Us */}
+              <div className="mt-6 grid grid-cols-3 items-center">
+                <div className="justify-self-start">
+                  <button className="btn-ghost" onClick={() => go("results")}>← Back</button>
+                </div>
+                <div className="justify-self-center">
+                  <a
+                    className="btn-green"
+                    href={
+                      `mailto:spower@monaco.edu` +
+                      `?subject=${encodeURIComponent("AI Enablement Pilot — Next Steps")}` +
+                      `&body=${encodeURIComponent(
+                        `Hi Stephen,\n\nI'd like to discuss pilot programs and next steps for our team.\n\nContext:\n- Headcount: ${headcount}\n- Adoption score: ${adoption}\n- Estimated annual value: ${symbol}${Math.round(annualValue).toLocaleString()}\n- ROI: ${annualROI.toFixed(1)}x\n\nThanks,\n`
+                      )}`
+                    }
+                  >
+                    Contact Us
+                  </a>
+                </div>
+                <div className="justify-self-end">
+                  <button className="btn" onClick={reset}>Start over</button>
+                </div>
               </div>
             </div>
           )}
