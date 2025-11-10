@@ -42,7 +42,7 @@ const PRIORITY_META: Record<PriorityKey, { label: string; blurb: string; default
 
 const AZURE = "#00D7FF";
 
-/* KPI tile (value text size increased) */
+/* KPI tile */
 function Pill({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div
@@ -54,7 +54,6 @@ function Pill({ label, value }: { label: string; value: React.ReactNode }) {
       }}
     >
       <div className="text-sm opacity-80">{label}</div>
-      {/* Bigger value text */}
       <div className="mt-1 font-bold text-2xl md:text-3xl">{value}</div>
     </div>
   );
@@ -266,7 +265,7 @@ export default function Page() {
   /* ---------- UI ---------- */
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-page)", color: "var(--text)" }}>
-      {/* Global CSS just for range thumb (no styled-jsx) */}
+      {/* Global CSS for the vivid-azure thumb */}
       <style>{`
         input.range-vivid::-webkit-slider-thumb {
           -webkit-appearance: none;
@@ -428,7 +427,9 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end">
+              {/* NOW WITH BACK BUTTON */}
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
                 <button className="btn" onClick={() => go("priorities")}>Continue →</button>
               </div>
             </div>
@@ -445,15 +446,24 @@ export default function Page() {
                   const active = selected.includes(k);
                   const disabled = !active && selected.length >= 3;
                   return (
-                    <div key={k} className={`priority ${active ? "priority--active" : ""} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
+                    <div
+                      key={k}
+                      className={`priority ${active ? "priority--active" : ""} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                    >
                       <div className="flex items-center justify-between">
                         <span className="font-semibold">{PRIORITY_META[k].label}</span>
+                        {/* FIXED SELECT PILL COLORS */}
                         <button
                           onClick={() => {
                             if (active) setSelected(selected.filter((x) => x !== k));
                             else if (!disabled) setSelected([...selected, k]);
                           }}
-                          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${active ? "bg-[var(--bg-chip)] text-white" : "bg-[#22252c] text-white"}`}
+                          className="rounded-full px-3 py-1.5 text-xs font-semibold border"
+                          style={{
+                            borderColor: AZURE,
+                            background: active ? AZURE : "transparent",
+                            color: active ? "#000" : AZURE,
+                          }}
                         >
                           {active ? "Selected" : "Select"}
                         </button>
@@ -464,8 +474,12 @@ export default function Page() {
                 })}
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <button className="btn" onClick={CONTINUE} disabled={selected.length !== 3}>Continue →</button>
+              {/* NOW WITH BACK BUTTON + DISABLED CONTINUE UNTIL 3 */}
+              <div className="mt-6 flex justify-between">
+                <button className="btn-ghost" onClick={back}>← Back</button>
+                <button className="btn" onClick={CONTINUE} disabled={selected.length !== 3}>
+                  Continue →
+                </button>
               </div>
             </div>
           )}
@@ -599,7 +613,7 @@ export default function Page() {
             </div>
           )}
 
-          {/* RESULTS — 3 headline boxes (bigger text already applied via Pill) */}
+          {/* RESULTS */}
           {stepKey === "results" && (
             <div>
               <h2 className="title">Results</h2>
